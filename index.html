@@ -5,228 +5,242 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gmail Shortcut Challenge</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
-        /* Gmail-inspired color palette */
-        :root {
-            --gmail-red: #D93025;
-            --gmail-blue: #1A73E8;
-            --gmail-yellow: #FBBC04;
-            --gmail-green: #34A853;
-            --gmail-gray: #F1F3F4;
-            --text-dark: #202124;
-            --text-light: #5f6368;
+        .shortcut-key {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 0.3rem;
+            background-color: #f7f7f7;
+            box-shadow: 0 2px 0 #ccc;
+            font-weight: 500;
+            color: #333;
+            margin: 0 0.25rem;
         }
-        .correct-animation {
-            animation: correct 0.4s ease-out;
+        .feedback-animation {
+            animation: pop-in 0.3s ease-out;
         }
-        .incorrect-animation {
-            animation: incorrect 0.4s ease-in-out;
-        }
-        @keyframes correct {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); background-color: var(--gmail-green); }
-            100% { transform: scale(1); }
-        }
-        @keyframes incorrect {
-            0%, 100% { transform: translateX(0); }
-            20% { transform: translateX(-10px); }
-            40% { transform: translateX(10px); }
-            60% { transform: translateX(-10px); }
-            80% { transform: translateX(10px); }
-        }
-        .timer-bar-inner {
-            transition: width 0.2s linear;
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            80% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 text-text-dark">
-
-    <div id="gameContainer" class="w-full max-w-2xl mx-auto text-center">
-        
-        <!-- Start Screen -->
-        <div id="startScreen" class="bg-white p-8 md:p-12 rounded-2xl shadow-lg">
-            <h1 class="text-4xl md:text-5xl font-extrabold mb-2">Gmail Shortcut Challenge</h1>
-            <p class="text-lg text-text-light mb-8">How fast can you recall Gmail shortcuts? Press the right keyboard shortcuts for the actions shown.</p>
-            <button id="startButton" class="bg-gmail-blue text-white font-bold py-3 px-8 rounded-lg text-xl hover:bg-blue-700 transition-colors transform hover:scale-105">Start Game</button>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div id="game-container" class="w-full max-w-4xl mx-auto">
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-bold text-gray-800">Gmail Shortcut Challenge</h1>
+            <p class="text-gray-600 mt-2">Press the correct key to complete the action. How fast can you go?</p>
         </div>
 
-        <!-- Game Screen (Initially Hidden) -->
-        <div id="gameScreen" class="hidden">
-            <!-- Header with Stats -->
-            <div class="flex justify-between items-center mb-6">
-                <div class="text-left">
-                    <p class="text-sm text-text-light">Score</p>
-                    <p id="score" class="text-3xl font-bold">0</p>
+        <!-- Game UI -->
+        <div class="bg-white rounded-lg shadow-xl p-6 relative">
+            <!-- Score and Instruction -->
+            <div class="flex justify-between items-center mb-4 border-b pb-4">
+                <div id="instruction-card" class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md w-full">
+                    <p class="font-bold">Your task:</p>
+                    <p id="instruction-text" class="text-lg">Click "Start Game" to begin!</p>
                 </div>
-                <div class="text-right">
-                    <p class="text-sm text-text-light">Time Left</p>
-                    <p id="time" class="text-3xl font-bold">30</p>
+                 <div class="text-right ml-4 flex-shrink-0">
+                    <div class="text-sm text-gray-500">SCORE</div>
+                    <div id="score" class="text-3xl font-bold text-gray-800">0</div>
                 </div>
+            </div>
+
+            <!-- Mock Email -->
+            <div id="email-view">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 id="email-subject" class="text-2xl font-semibold text-gray-800">Welcome to the Challenge!</h2>
+                    <div id="email-labels" class="flex space-x-2"></div>
+                </div>
+                <div class="flex items-center space-x-3 mb-6">
+                    <div class="w-10 h-10 bg-green-500 text-white flex items-center justify-center rounded-full font-bold" id="email-avatar">G</div>
+                    <div>
+                        <div class="font-bold text-gray-700" id="email-sender">Game Master</div>
+                        <div class="text-sm text-gray-500">to me</div>
+                    </div>
+                </div>
+                <div id="email-body" class="text-gray-600 leading-relaxed">
+                    <p>This is a simulated Gmail inbox. An instruction will appear at the top. Your job is to press the correct keyboard shortcut to perform that action.</p>
+                    <p class="mt-4">For example, if it says "Compose a new email", you would press the 'c' key.</p>
+                    <p class="mt-4">Good luck!</p>
+                </div>
+            </div>
+
+            <!-- Feedback Overlay -->
+            <div id="feedback-overlay" class="absolute inset-0 bg-white bg-opacity-80 flex-col items-center justify-center rounded-lg text-center p-8 hidden">
+                <div id="feedback-icon" class="text-6xl mb-4"></div>
+                <div id="feedback-text" class="text-3xl font-bold"></div>
+                <div id="feedback-hint" class="text-lg text-gray-600 mt-2"></div>
             </div>
             
-            <!-- Timer Bar -->
-            <div class="w-full bg-gray-200 rounded-full h-4 mb-8 shadow-inner">
-                <div id="timerBar" class="bg-gradient-to-r from-gmail-green to-gmail-blue h-4 rounded-full timer-bar-inner"></div>
-            </div>
-
-            <!-- Main Action Card -->
-            <div id="shortcutCard" class="bg-white p-10 md:p-16 rounded-2xl shadow-2xl transition-transform duration-300">
-                <p class="text-lg text-text-light mb-2">Action</p>
-                <h2 id="actionText" class="text-4xl md:text-6xl font-black truncate">Compose</h2>
-                <div id="feedback" class="mt-4 h-8 text-2xl font-bold"></div>
+            <!-- Modal for specific actions -->
+            <div id="action-modal" class="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center rounded-lg hidden">
+                <div class="bg-white p-6 rounded-lg shadow-2xl text-center">
+                    <h3 id="modal-title" class="text-xl font-bold"></h3>
+                </div>
             </div>
         </div>
-
-        <!-- Game Over Screen (Initially Hidden) -->
-        <div id="gameOverScreen" class="hidden bg-white p-8 md:p-12 rounded-2xl shadow-lg">
-            <h2 class="text-4xl font-extrabold mb-2">Time's Up!</h2>
-            <p class="text-lg text-text-light mb-4">Your final score is:</p>
-            <p id="finalScore" class="text-8xl font-black text-gmail-blue mb-8">0</p>
-            <button id="restartButton" class="bg-gmail-blue text-white font-bold py-3 px-8 rounded-lg text-xl hover:bg-blue-700 transition-colors transform hover:scale-105">Play Again</button>
+        
+        <div class="text-center mt-6">
+            <button id="start-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Start Game</button>
         </div>
-
     </div>
 
     <script>
-        // DOM Elements
-        const startScreen = document.getElementById('startScreen');
-        const gameScreen = document.getElementById('gameScreen');
-        const gameOverScreen = document.getElementById('gameOverScreen');
-        const startButton = document.getElementById('startButton');
-        const restartButton = document.getElementById('restartButton');
-        const scoreDisplay = document.getElementById('score');
-        const timeDisplay = document.getElementById('time');
-        const timerBar = document.getElementById('timerBar');
-        const actionText = document.getElementById('actionText');
-        const shortcutCard = document.getElementById('shortcutCard');
-        const feedback = document.getElementById('feedback');
-        const finalScoreDisplay = document.getElementById('finalScore');
-
-        // Gmail Shortcuts Data
-        const shortcuts = [
-            { action: "Compose", key: "c" },
-            { action: "Archive", key: "e" },
-            { action: "Reply", key: "r" },
-            { action: "Reply All", key: "a" },
-            { action: "Create Task", key: "shift t"},
-            { action: "Label", key: "l"},
-        ];
-
-        // Game State
-        let score = 0;
-        let timeLeft = 30; // initial time
-        const maxTime = 30;
-        let timerInterval;
-        let currentShortcut;
-        let isGameActive = false;
-
-        // --- Game Logic ---
-
-        function startGame() {
-            startScreen.classList.add('hidden');
-            gameOverScreen.classList.add('hidden');
-            gameScreen.classList.remove('hidden');
-
-            score = 0;
-            timeLeft = maxTime;
-            isGameActive = true;
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const instructionText = document.getElementById('instruction-text');
+            const scoreEl = document.getElementById('score');
+            const startButton = document.getElementById('start-button');
+            const feedbackOverlay = document.getElementById('feedback-overlay');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            const feedbackText = document.getElementById('feedback-text');
+            const feedbackHint = document.getElementById('feedback-hint');
+            const emailSubject = document.getElementById('email-subject');
+            const emailSender = document.getElementById('email-sender');
+            const emailAvatar = document.getElementById('email-avatar');
+            const emailBody = document.getElementById('email-body');
+            const emailLabels = document.getElementById('email-labels');
+            const actionModal = document.getElementById('action-modal');
+            const modalTitle = document.getElementById('modal-title');
             
-            updateScore();
-            updateTimerDisplay();
-            nextShortcut();
+            // --- Game State ---
+            let score = 0;
+            let activeChallenge = null;
+            let gameActive = false;
+            
+            // --- Game Data ---
+            const shortcuts = [
+                { key: 'e', code: 'KeyE', shift: false, description: 'Archive this email' },
+                { key: 'v', code: 'KeyV', shift: false, description: 'Move this email' },
+                { key: 'shift + t', code: 'KeyT', shift: true, description: 'Create a task from this email' },
+                { key: 'l', code: 'KeyL', shift: false, description: 'Label this email' },
+                { key: 'r', code: 'KeyR', shift: false, description: 'Reply to this email' },
+                { key: 'a', code: 'KeyA', shift: false, description: 'Reply to all' },
+                { key: 'c', code: 'KeyC', shift: false, description: 'Compose a new email' }
+            ];
 
-            timerInterval = setInterval(updateTimer, 1000);
-            window.addEventListener('keydown', handleKeyPress);
-        }
-
-        function endGame() {
-            isGameActive = false;
-            clearInterval(timerInterval);
-            gameScreen.classList.add('hidden');
-            gameOverScreen.classList.remove('hidden');
-            finalScoreDisplay.textContent = score;
-            window.removeEventListener('keydown', handleKeyPress);
-        }
-
-        function updateTimer() {
-            timeLeft--;
-            updateTimerDisplay();
-            if (timeLeft <= 0) {
-                endGame();
-            }
-        }
-
-        function updateTimerDisplay() {
-            timeDisplay.textContent = timeLeft;
-            const percentage = (timeLeft / maxTime) * 100;
-            timerBar.style.width = `${percentage}%`;
-            // Change color as time runs out
-            if (percentage < 25) {
-                timerBar.style.backgroundColor = 'var(--gmail-red)';
-            } else if (percentage < 50) {
-                timerBar.style.backgroundColor = 'var(--gmail-yellow)';
-            } else {
-                timerBar.style.background = 'linear-gradient(to right, var(--gmail-green), var(--gmail-blue))';
-            }
-        }
-        
-        function updateScore() {
-            scoreDisplay.textContent = score;
-        }
-
-        function nextShortcut() {
-            const randomIndex = Math.floor(Math.random() * shortcuts.length);
-            currentShortcut = shortcuts[randomIndex];
-            actionText.textContent = currentShortcut.action;
-            feedback.textContent = '';
-        }
-
-        function handleKeyPress(e) {
-            if (!isGameActive) return;
-
-            // Prevent default browser actions for keys like '/' (search)
-            e.preventDefault();
-
-            if (e.key.toLowerCase() === currentShortcut.key) {
-                // Correct answer
-                score++;
-                timeLeft = Math.min(maxTime, timeLeft + 2); // Add 2 seconds bonus, capped at maxTime
+            const mockEmails = [
+                { subject: "Project Update", sender: "Alice", body: "Just wanted to share the latest updates on Project Phoenix. The new designs are attached." },
+                { subject: "Team Lunch?", sender: "Bob", body: "Hey team, are we still on for lunch this Friday? Let me know your thoughts!" },
+                { subject: "Weekly Report", sender: "Charlie", body: "Please find the weekly performance report attached. Let's discuss it in our meeting tomorrow." },
+                { subject: "Your recent order", sender: "Online Store", body: "Thank you for your order! Your items have been shipped and will arrive in 3-5 business days." },
+                { subject: "Networking Event Invite", sender: "Eva", body: "Hi there, I'd like to invite you to our annual tech networking event next month. Hope to see you there!" }
+            ];
+            
+            // --- Game Logic ---
+            const startGame = () => {
+                score = 0;
+                gameActive = true;
                 updateScore();
-                updateTimerDisplay();
+                startButton.textContent = 'Restart Game';
+                nextChallenge();
+            };
+
+            const nextChallenge = () => {
+                // Pick a random shortcut and email
+                activeChallenge = shortcuts[Math.floor(Math.random() * shortcuts.length)];
+                const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
+
+                // Update UI
+                instructionText.textContent = activeChallenge.description;
+                emailSubject.textContent = email.subject;
+                emailSender.textContent = email.sender;
+                emailAvatar.textContent = email.sender.charAt(0).toUpperCase();
+                emailBody.innerHTML = `<p>${email.body}</p>`;
+                emailLabels.innerHTML = '';
+            };
+
+            const handleCorrectAnswer = () => {
+                score++;
+                updateScore();
+                showFeedback(true);
                 
-                shortcutCard.classList.add('correct-animation');
-                feedback.textContent = `Correct! It's "${currentShortcut.key}"`;
-                feedback.style.color = 'var(--gmail-green)';
+                // Show a quick modal for certain actions
+                if (['v', 'l'].includes(activeChallenge.key)) {
+                    const action = activeChallenge.key === 'v' ? 'Move to...' : 'Label as...';
+                    modalTitle.textContent = action;
+                    actionModal.classList.remove('hidden');
+                    actionModal.classList.add('flex');
+                } else if (activeChallenge.key === 'shift + t') {
+                    modalTitle.textContent = 'Task Created!';
+                    actionModal.classList.remove('hidden');
+                    actionModal.classList.add('flex');
+                }
+
+
+                setTimeout(() => {
+                    feedbackOverlay.classList.add('hidden');
+                    actionModal.classList.add('hidden');
+                    nextChallenge();
+                }, 1200);
+            };
+
+            const handleWrongAnswer = (pressedKey) => {
+                showFeedback(false, pressedKey);
+                setTimeout(() => {
+                    feedbackOverlay.classList.add('hidden');
+                }, 1500);
+            };
+
+            const showFeedback = (isCorrect, pressedKey = '') => {
+                feedbackOverlay.classList.remove('hidden');
+                feedbackOverlay.classList.add('flex', 'feedback-animation');
                 
-                setTimeout(() => {
-                    shortcutCard.classList.remove('correct-animation');
-                    nextShortcut();
-                }, 400);
+                if (isCorrect) {
+                    feedbackIcon.innerHTML = '✅';
+                    feedbackIcon.style.color = '#10B981';
+                    feedbackText.textContent = 'Correct!';
+                    feedbackText.style.color = '#10B981';
+                    feedbackHint.innerHTML = '';
+                } else {
+                    feedbackIcon.innerHTML = '❌';
+                    feedbackIcon.style.color = '#EF4444';
+                    feedbackText.textContent = 'Not quite!';
+                    feedbackText.style.color = '#EF4444';
+                    feedbackHint.innerHTML = `You pressed <span class="shortcut-key">${pressedKey}</span>. The correct shortcut is <span class="shortcut-key">${activeChallenge.key}</span>.`;
+                }
+            };
+            
+            const updateScore = () => {
+                scoreEl.textContent = score;
+            };
 
-            } else {
-                // Incorrect answer
-                timeLeft = Math.max(0, timeLeft - 3); // Subtract 3 seconds penalty
-                updateTimerDisplay();
-                shortcutCard.classList.add('incorrect-animation');
-                feedback.textContent = `Nope! The correct key was "${currentShortcut.key}"`;
-                feedback.style.color = 'var(--gmail-red)';
+            // --- Event Listeners ---
+            startButton.addEventListener('click', startGame);
 
-                setTimeout(() => {
-                    shortcutCard.classList.remove('incorrect-animation');
-                }, 400);
-            }
-        }
+            document.addEventListener('keydown', (e) => {
+                if (!gameActive || e.repeat) return;
+                
+                // Prevent browser shortcuts from firing (e.g., Ctrl+R)
+                if (e.key !== 'F5' && e.key !== 'F12') {
+                    e.preventDefault();
+                }
 
-        // Event Listeners
-        startButton.addEventListener('click', startGame);
-        restartButton.addEventListener('click', startGame);
-
+                if (e.code === activeChallenge.code && e.shiftKey === activeChallenge.shift) {
+                    handleCorrectAnswer();
+                } else {
+                    let pressed = '';
+                    if (e.shiftKey) pressed += 'shift + ';
+                    if (e.ctrlKey) pressed += 'ctrl + ';
+                    if (e.altKey) pressed += 'alt + ';
+                    pressed += e.key.toLowerCase();
+                    
+                    // Don't penalize for pressing just 'shift', 'ctrl', etc.
+                    if (!['shift', 'control', 'alt'].includes(e.key.toLowerCase())) {
+                       handleWrongAnswer(pressed);
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
