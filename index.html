@@ -48,9 +48,15 @@
                     <p class="font-bold">Your task:</p>
                     <p id="instruction-text" class="text-lg">Click "Start Game" to begin!</p>
                 </div>
-                 <div class="text-right ml-4 flex-shrink-0">
-                    <div class="text-sm text-gray-500">SCORE</div>
-                    <div id="score" class="text-3xl font-bold text-gray-800">0</div>
+                 <div class="text-right ml-4 flex-shrink-0 space-y-2">
+                    <div>
+                        <div class="text-sm text-gray-500">SCORE</div>
+                        <div id="score" class="text-3xl font-bold text-gray-800">0</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">TIME</div>
+                        <div id="timer" class="text-3xl font-bold text-gray-800">60</div>
+                    </div>
                 </div>
             </div>
 
@@ -99,6 +105,7 @@
             // --- DOM Elements ---
             const instructionText = document.getElementById('instruction-text');
             const scoreEl = document.getElementById('score');
+            const timerEl = document.getElementById('timer');
             const startButton = document.getElementById('start-button');
             const feedbackOverlay = document.getElementById('feedback-overlay');
             const feedbackIcon = document.getElementById('feedback-icon');
@@ -117,6 +124,9 @@
             let activeChallenge = null;
             let gameActive = false;
             let challenges = [];
+            let timerInterval = null;
+            let timeLeft = 60;
+            const TIME_LIMIT = 60;
             
             // --- Game Data ---
             const shortcuts = [
@@ -141,10 +151,23 @@
             const startGame = () => {
                 score = 0;
                 gameActive = true;
+                timeLeft = TIME_LIMIT;
+                timerEl.textContent = timeLeft;
+                clearInterval(timerInterval);
+
                 // Shuffle and create a queue of challenges
                 challenges = [...shortcuts].sort(() => Math.random() - 0.5);
                 updateScore();
                 startButton.textContent = 'Restart Game';
+                
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerEl.textContent = timeLeft;
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+
                 nextChallenge();
             };
 
@@ -168,13 +191,23 @@
             };
             
             const endGame = () => {
+                clearInterval(timerInterval);
                 gameActive = false;
-                instructionText.textContent = `Round complete! Final score: ${score}/${shortcuts.length}`;
+                
+                let endMessage = `Time's up! Final score: ${score}`;
+                if (challenges.length === 0 && timeLeft > 0) {
+                     endMessage = `Round complete! Final score: ${score}/${shortcuts.length}`;
+                     emailSubject.textContent = 'You did it!';
+                     emailAvatar.textContent = '🎉';
+                     emailBody.innerHTML = '<p>You\'ve completed all the challenges. Click "Play Again" to test your skills once more!</p>';
+                } else {
+                     emailSubject.textContent = 'Time is up!';
+                     emailAvatar.textContent = '⏰';
+                     emailBody.innerHTML = `<p>You managed to get ${score} correct before the time ran out. Try again!</p>`;
+                }
+
+                instructionText.textContent = endMessage;
                 startButton.textContent = 'Play Again';
-                emailSubject.textContent = 'You did it!';
-                emailSender.textContent = 'Game Master';
-                emailAvatar.textContent = '🎉';
-                emailBody.innerHTML = '<p>You\'ve completed all the challenges. Click "Play Again" to test your skills once more!</p>';
             }
 
             const handleCorrectAnswer = () => {
@@ -262,5 +295,6 @@
     </script>
 </body>
 </html>
+
 
 
