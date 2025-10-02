@@ -116,6 +116,7 @@
             let score = 0;
             let activeChallenge = null;
             let gameActive = false;
+            let challenges = [];
             
             // --- Game Data ---
             const shortcuts = [
@@ -140,14 +141,21 @@
             const startGame = () => {
                 score = 0;
                 gameActive = true;
+                // Shuffle and create a queue of challenges
+                challenges = [...shortcuts].sort(() => Math.random() - 0.5);
                 updateScore();
                 startButton.textContent = 'Restart Game';
                 nextChallenge();
             };
 
             const nextChallenge = () => {
-                // Pick a random shortcut and email
-                activeChallenge = shortcuts[Math.floor(Math.random() * shortcuts.length)];
+                if (challenges.length === 0) {
+                    endGame();
+                    return;
+                }
+
+                // Get the next challenge from the queue
+                activeChallenge = challenges.pop();
                 const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
 
                 // Update UI
@@ -158,6 +166,16 @@
                 emailBody.innerHTML = `<p>${email.body}</p>`;
                 emailLabels.innerHTML = '';
             };
+            
+            const endGame = () => {
+                gameActive = false;
+                instructionText.textContent = `Round complete! Final score: ${score}/${shortcuts.length}`;
+                startButton.textContent = 'Play Again';
+                emailSubject.textContent = 'You did it!';
+                emailSender.textContent = 'Game Master';
+                emailAvatar.textContent = '🎉';
+                emailBody.innerHTML = '<p>You\'ve completed all the challenges. Click "Play Again" to test your skills once more!</p>';
+            }
 
             const handleCorrectAnswer = () => {
                 score++;
@@ -244,4 +262,5 @@
     </script>
 </body>
 </html>
+
 
