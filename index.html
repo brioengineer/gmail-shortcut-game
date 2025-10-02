@@ -57,6 +57,10 @@
                         <div class="text-sm text-gray-500">TIME</div>
                         <div id="timer" class="text-3xl font-bold text-gray-800">60</div>
                     </div>
+                     <div>
+                        <div class="text-sm text-gray-500">BEST</div>
+                        <div id="high-score" class="text-3xl font-bold text-gray-800">0</div>
+                    </div>
                 </div>
             </div>
 
@@ -106,6 +110,7 @@
             const instructionText = document.getElementById('instruction-text');
             const scoreEl = document.getElementById('score');
             const timerEl = document.getElementById('timer');
+            const highScoreEl = document.getElementById('high-score');
             const startButton = document.getElementById('start-button');
             const feedbackOverlay = document.getElementById('feedback-overlay');
             const feedbackIcon = document.getElementById('feedback-icon');
@@ -121,6 +126,7 @@
             
             // --- Game State ---
             let score = 0;
+            let highScore = 0;
             let activeChallenge = null;
             let gameActive = false;
             let challenges = [];
@@ -146,6 +152,12 @@
                 { subject: "Your recent order", sender: "Online Store", body: "Thank you for your order! Your items have been shipped and will arrive in 3-5 business days." },
                 { subject: "Networking Event Invite", sender: "Eva", body: "Hi there, I'd like to invite you to our annual tech networking event next month. Hope to see you there!" }
             ];
+
+            // --- Initial Setup ---
+            const loadHighScore = () => {
+                highScore = localStorage.getItem('gmailShortcutHighScore') || 0;
+                highScoreEl.textContent = highScore;
+            };
             
             // --- Game Logic ---
             const startGame = () => {
@@ -156,7 +168,7 @@
                 clearInterval(timerInterval);
 
                 // Shuffle and create a queue of challenges
-                challenges = [...shortcuts].sort(() => Math.random() - 0.5);
+                challenges = [...shortcuts, ...shortcuts, ...shortcuts].sort(() => Math.random() - 0.5); // Repeat list to fill time
                 updateScore();
                 startButton.textContent = 'Restart Game';
                 
@@ -195,19 +207,20 @@
                 gameActive = false;
                 
                 let endMessage = `Time's up! Final score: ${score}`;
-                if (challenges.length === 0 && timeLeft > 0) {
-                     endMessage = `Round complete! Final score: ${score}/${shortcuts.length}`;
-                     emailSubject.textContent = 'You did it!';
-                     emailAvatar.textContent = '🎉';
-                     emailBody.innerHTML = '<p>You\'ve completed all the challenges. Click "Play Again" to test your skills once more!</p>';
-                } else {
-                     emailSubject.textContent = 'Time is up!';
-                     emailAvatar.textContent = '⏰';
-                     emailBody.innerHTML = `<p>You managed to get ${score} correct before the time ran out. Try again!</p>`;
-                }
 
+                // Check for new high score
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('gmailShortcutHighScore', highScore);
+                    highScoreEl.textContent = highScore;
+                    endMessage += ' 🎉 New High Score!';
+                }
+                
                 instructionText.textContent = endMessage;
                 startButton.textContent = 'Play Again';
+                emailSubject.textContent = 'Time is up!';
+                emailAvatar.textContent = '⏰';
+                emailBody.innerHTML = `<p>You managed to get ${score} correct answers. ${score > highScore ? 'You set a new high score!' : `Your best is ${highScore}.`} Try again!</p>`;
             }
 
             const handleCorrectAnswer = () => {
@@ -291,10 +304,11 @@
                     }
                 }
             });
+
+            // Load high score on initial page load
+            loadHighScore();
         });
     </script>
 </body>
 </html>
-
-
 
