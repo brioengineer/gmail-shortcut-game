@@ -119,7 +119,7 @@
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
             <div class="flex justify-between items-center border-b p-4">
                 <h3 class="text-2xl font-bold">Top 10 Players</h3>
-                <button id="close-leaderboard-button" class="text-gray-500 hover:text-gray-800">&times;</button>
+                <button id="close-leaderboard-button" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
             </div>
             <div class="p-6">
                 <table class="w-full text-left">
@@ -145,14 +145,16 @@
             <h3 class="text-2xl font-bold mb-2">New Best Time!</h3>
             <p class="text-gray-600 mb-4">Enter your name to join the leaderboard.</p>
             <input type="text" id="player-name-input" placeholder="Your Name" class="w-full border-2 border-gray-300 rounded-md p-2 mb-4 focus:border-blue-500 focus:outline-none">
+            <p id="player-name-error" class="text-red-500 text-sm mb-2 hidden">Please enter a name.</p>
             <button id="submit-score-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg w-full">Submit Score</button>
+            <button id="cancel-submit-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg w-full mt-2">Cancel</button>
         </div>
     </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Firebase Setup ---
@@ -206,7 +208,9 @@
             // Submit score elements
             const submitScoreModal = document.getElementById('submit-score-modal');
             const playerNameInput = document.getElementById('player-name-input');
+            const playerNameError = document.getElementById('player-name-error');
             const submitScoreButton = document.getElementById('submit-score-button');
+            const cancelSubmitButton = document.getElementById('cancel-submit-button');
 
             // --- Game State ---
             let bestTime = null;
@@ -217,6 +221,8 @@
             let startTime = 0;
             let completedChallenges = 0;
             let lastGameTime = 0;
+            let sequenceState = null;
+            let sequenceTimeout = null;
             const CHALLENGE_COUNT = 15;
 
             // --- Game Data ---
@@ -402,16 +408,14 @@
 
                 try {
                     const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
-                    const snapshot = await getDocs(leaderboardCol);
-                    const scores = snapshot.docs.map(doc => doc.data());
-
-                    scores.sort((a, b) => a.time - b.time);
-
-                    const top10 = scores.slice(0, 10);
+                    const q = query(leaderboardCol, orderBy("time", "asc"), limit(10));
+                    const snapshot = await getDocs(q);
                     
-                    leaderboardBody.innerHTML = top10.map((score, index) => `
+                    const scores = snapshot.docs.map(doc => doc.data());
+                    
+                    leaderboardBody.innerHTML = scores.map((score, index) => `
                         <tr class="border-b">
-                            <td class="p-2">${index + 1}</td>
+                            <td class="p-2 font-bold">${index + 1}</td>
                             <td class="p-2">${score.name}</td>
                             <td class="p-2">${score.time.toFixed(1)}</td>
                         </tr>
@@ -427,8 +431,9 @@
 
             const submitScore = async () => {
                 const playerName = playerNameInput.value.trim();
+                playerNameError.classList.add('hidden');
                 if (!playerName) {
-                    alert("Please enter a name.");
+                    playerNameError.classList.remove('hidden');
                     return;
                 }
 
@@ -458,22 +463,43 @@
             leaderboardButton.addEventListener('click', showLeaderboard);
             closeLeaderboardButton.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
             submitScoreButton.addEventListener('click', submitScore);
+            cancelSubmitButton.addEventListener('click', () => {
+                submitScoreModal.classList.add('hidden');
+                playerNameError.classList.add('hidden');
+            });
+
 
             document.addEventListener('keydown', (e) => {
                 if (!gameActive || e.repeat) return;
                 
                 if (e.key !== 'F5' && e.key !== 'F12') e.preventDefault();
                 
-                let correctCode = activeChallenge.code;
-                if (activeChallenge.key === '#') correctCode = 'Digit3';
-                if (activeChallenge.key === '!') correctCode = 'Digit1';
+                clearTimeout(sequenceTimeout);
 
-                if (e.code === correctCode && e.shiftKey === activeChallenge.shift) {
-                    handleCorrectAnswer();
+                if (activeChallenge.sequence) {
+                    if (sequenceState === null && e.code === activeChallenge.sequence[0]) {
+                        sequenceState = activeChallenge.sequence[0];
+                        sequenceTimeout = setTimeout(() => { sequenceState = null; }, 1500);
+                    } else if (sequenceState === activeChallenge.sequence[0] && e.code === activeChallenge.sequence[1]) {
+                        sequenceState = null;
+                        handleCorrectAnswer();
+                    } else {
+                        sequenceState = null;
+                        handleWrongAnswer((e.shiftKey ? 'shift + ' : '') + e.key.toLowerCase());
+                    }
                 } else {
-                    let pressed = (e.shiftKey ? 'shift + ' : '') + (e.ctrlKey ? 'ctrl + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
-                    if (!['shift', 'control', 'alt'].includes(e.key.toLowerCase())) {
-                       handleWrongAnswer(pressed);
+                    sequenceState = null;
+                    let correctCode = activeChallenge.code;
+                    if (activeChallenge.key === '#') correctCode = 'Digit3';
+                    if (activeChallenge.key === '!') correctCode = 'Digit1';
+
+                    if (e.code === correctCode && e.shiftKey === activeChallenge.shift) {
+                        handleCorrectAnswer();
+                    } else {
+                        let pressed = (e.shiftKey ? 'shift + ' : '') + (e.ctrlKey ? 'ctrl + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
+                        if (!['shift', 'control', 'alt', 'meta'].includes(e.key.toLowerCase())) {
+                           handleWrongAnswer(pressed);
+                        }
                     }
                 }
             });
