@@ -31,10 +31,12 @@
             80% { transform: scale(1.05); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
-        /* Custom checkbox style */
         .shortcut-checkbox:checked + label {
             border-color: #3B82F6;
             background-color: #EFF6FF;
+        }
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -51,8 +53,9 @@
             <div id="shortcut-selection" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
                 <!-- Checkboxes will be dynamically inserted here -->
             </div>
-            <div class="text-center">
+            <div class="flex justify-center items-center gap-4">
                  <button id="start-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Start Timed Challenge</button>
+                 <button id="leaderboard-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">View Leaderboard</button>
             </div>
              <p id="selection-error" class="text-red-500 text-center mt-4 hidden">Please select at least one shortcut to practice.</p>
         </div>
@@ -85,7 +88,6 @@
             <div id="email-view">
                 <div class="flex items-center justify-between mb-3">
                     <h2 id="email-subject" class="text-2xl font-semibold text-gray-800">Welcome to the Challenge!</h2>
-                    <div id="email-labels" class="flex space-x-2"></div>
                 </div>
                 <div class="flex items-center space-x-3 mb-6">
                     <div class="w-10 h-10 bg-green-500 text-white flex items-center justify-center rounded-full font-bold" id="email-avatar">G</div>
@@ -95,7 +97,7 @@
                     </div>
                 </div>
                 <div id="email-body" class="text-gray-600 leading-relaxed">
-                    <p>This is a simulated Gmail inbox. An instruction will appear at the top. Your job is to press the correct keyboard shortcut to perform that action.</p>
+                    <p>An instruction will appear at the top. Your job is to press the correct keyboard shortcut.</p>
                 </div>
             </div>
 
@@ -105,13 +107,6 @@
                 <div id="feedback-text" class="text-3xl font-bold"></div>
                 <div id="feedback-hint" class="text-lg text-gray-600 mt-2"></div>
             </div>
-            
-            <!-- Modal for specific actions -->
-            <div id="action-modal" class="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center rounded-lg hidden">
-                <div class="bg-white p-6 rounded-lg shadow-2xl text-center">
-                    <h3 id="modal-title" class="text-xl font-bold"></h3>
-                </div>
-            </div>
         </div>
 
         <div id="end-game-controls" class="text-center mt-6 hidden">
@@ -119,8 +114,66 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+            <div class="flex justify-between items-center border-b p-4">
+                <h3 class="text-2xl font-bold">Top 10 Players</h3>
+                <button id="close-leaderboard-button" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div class="p-6">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr>
+                            <th class="p-2">Rank</th>
+                            <th class="p-2">Name</th>
+                            <th class="p-2">Time (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <!-- Scores will be inserted here -->
+                    </tbody>
+                </table>
+                <p id="leaderboard-loading" class="text-center text-gray-500 mt-4">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit Score Modal -->
+    <div id="submit-score-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
+            <h3 class="text-2xl font-bold mb-2">New Best Time!</h3>
+            <p class="text-gray-600 mb-4">Enter your name to join the leaderboard.</p>
+            <input type="text" id="player-name-input" placeholder="Your Name" class="w-full border-2 border-gray-300 rounded-md p-2 mb-4 focus:border-blue-500 focus:outline-none">
+            <button id="submit-score-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg w-full">Submit Score</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // --- Firebase Setup ---
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            let db, auth;
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('debug');
+
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+            }
+
             // --- DOM Elements ---
             const instructionText = document.getElementById('instruction-text');
             const progressEl = document.getElementById('progress');
@@ -136,9 +189,6 @@
             const emailSender = document.getElementById('email-sender');
             const emailAvatar = document.getElementById('email-avatar');
             const emailBody = document.getElementById('email-body');
-            const emailLabels = document.getElementById('email-labels');
-            const actionModal = document.getElementById('action-modal');
-            const modalTitle = document.getElementById('modal-title');
             const gameSetup = document.getElementById('game-setup');
             const gameUi = document.getElementById('game-ui');
             const subtitle = document.getElementById('subtitle');
@@ -146,6 +196,18 @@
             const selectionError = document.getElementById('selection-error');
             const endGameControls = document.getElementById('end-game-controls');
             
+            // Leaderboard elements
+            const leaderboardButton = document.getElementById('leaderboard-button');
+            const leaderboardModal = document.getElementById('leaderboard-modal');
+            const closeLeaderboardButton = document.getElementById('close-leaderboard-button');
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            const leaderboardLoading = document.getElementById('leaderboard-loading');
+            
+            // Submit score elements
+            const submitScoreModal = document.getElementById('submit-score-modal');
+            const playerNameInput = document.getElementById('player-name-input');
+            const submitScoreButton = document.getElementById('submit-score-button');
+
             // --- Game State ---
             let bestTime = null;
             let activeChallenge = null;
@@ -154,6 +216,7 @@
             let timerInterval = null;
             let startTime = 0;
             let completedChallenges = 0;
+            let lastGameTime = 0;
             const CHALLENGE_COUNT = 15;
 
             // --- Game Data ---
@@ -166,22 +229,23 @@
                 { key: 'l', code: 'KeyL', shift: false, description: 'Label' },
                 { key: 'v', code: 'KeyV', shift: false, description: 'Move' },
                 { key: 's', code: 'KeyS', shift: false, description: 'Star' },
-                { key: '#', code: 'Digit3', shift: true, description: 'Delete' }, // Note: '#' is often Shift+3
-                { key: '!', code: 'Digit1', shift: true, description: 'Report as spam' }, // Note: '!' is often Shift+1
+                { key: '#', code: 'Digit3', shift: true, description: 'Delete' },
+                { key: '!', code: 'Digit1', shift: true, description: 'Report spam' },
                 { key: 'z', code: 'KeyZ', shift: false, description: 'Undo' },
                 { key: 'shift + t', code: 'KeyT', shift: true, description: 'Create task' },
-                { key: 'j', code: 'KeyJ', shift: false, description: 'Go to next message' },
-                { key: 'k', code: 'KeyK', shift: false, description: 'Go to previous message' },
+                { key: 'j', code: 'KeyJ', shift: false, description: 'Next message' },
+                { key: 'k', code: 'KeyK', shift: false, description: 'Previous message' },
                 { key: 'o', code: 'KeyO', shift: false, description: 'Open message' },
                 { key: 'u', code: 'KeyU', shift: false, description: 'Back to threadlist' },
+                { key: '/', code: 'Slash', shift: false, description: 'Search mail' },
+                { key: 'g then i', sequence: ['KeyG', 'KeyI'], description: 'Go to Inbox' },
             ];
 
             const mockEmails = [
-                { subject: "Project Update", sender: "Alice", body: "Just wanted to share the latest updates on Project Phoenix. The new designs are attached." },
-                { subject: "Team Lunch?", sender: "Bob", body: "Hey team, are we still on for lunch this Friday? Let me know your thoughts!" },
-                { subject: "Weekly Report", sender: "Charlie", body: "Please find the weekly performance report attached. Let's discuss it in our meeting tomorrow." },
-                { subject: "Your recent order", sender: "Online Store", body: "Thank you for your order! Your items have been shipped and will arrive in 3-5 business days." },
-                { subject: "Networking Event Invite", sender: "Eva", body: "Hi there, I'd like to invite you to our annual tech networking event next month. Hope to see you there!" }
+                { subject: "Project Update", sender: "Alice", body: "Latest updates on Project Phoenix are attached." },
+                { subject: "Team Lunch?", sender: "Bob", body: "Are we still on for lunch this Friday?" },
+                { subject: "Weekly Report", sender: "Charlie", body: "Please find the weekly performance report attached." },
+                { subject: "Your recent order", sender: "Online Store", body: "Your items have been shipped!" },
             ];
 
             // --- Initial Setup ---
@@ -199,7 +263,7 @@
                     
                     const label = document.createElement('label');
                     label.htmlFor = `sc-${index}`;
-                    label.className = 'block border-2 border-gray-300 rounded-lg p-3 text-center cursor-pointer transition-all duration-200';
+                    label.className = 'block border-2 border-gray-300 rounded-lg p-3 text-center cursor-pointer transition-all duration-200 h-full';
                     label.innerHTML = `<span class="font-bold text-lg">${sc.key}</span><br><span class="text-sm text-gray-600">${sc.description}</span>`;
                     
                     div.appendChild(input);
@@ -216,7 +280,6 @@
             // --- Game Logic ---
             const startGame = () => {
                 const selectedIndexes = Array.from(shortcutSelectionContainer.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
-                
                 if (selectedIndexes.length === 0) {
                     selectionError.classList.remove('hidden');
                     return;
@@ -224,7 +287,6 @@
                 selectionError.classList.add('hidden');
 
                 const selectedShortcuts = selectedIndexes.map(i => allShortcuts[i]);
-                
                 challenges = [];
                 for(let i=0; i < CHALLENGE_COUNT; i++) {
                     challenges.push(selectedShortcuts[Math.floor(Math.random() * selectedShortcuts.length)]);
@@ -235,11 +297,9 @@
                 updateProgress();
                 
                 gameSetup.classList.add('hidden');
-                startButton.classList.add('hidden');
                 gameUi.classList.remove('hidden');
                 endGameControls.classList.add('hidden');
                 subtitle.textContent = "Press the correct key to complete the action. How fast can you go?";
-
 
                 startTime = Date.now();
                 timerInterval = setInterval(() => {
@@ -251,7 +311,7 @@
             };
 
             const nextChallenge = () => {
-                if (challenges.length === 0) {
+                if (completedChallenges >= CHALLENGE_COUNT) {
                     endGame();
                     return;
                 }
@@ -260,19 +320,18 @@
 
                 activeChallenge = challenges.pop();
                 const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
-
                 instructionText.textContent = activeChallenge.description;
                 emailSubject.textContent = email.subject;
                 emailSender.textContent = email.sender;
                 emailAvatar.textContent = email.sender.charAt(0).toUpperCase();
                 emailBody.innerHTML = `<p>${email.body}</p>`;
-                emailLabels.innerHTML = '';
             };
             
             const endGame = () => {
                 clearInterval(timerInterval);
                 const finalTime = (Date.now() - startTime) / 1000;
                 gameActive = false;
+                lastGameTime = finalTime;
                 
                 timerEl.textContent = `${finalTime.toFixed(1)}s`;
                 let endMessage = `Finished! Your time: ${finalTime.toFixed(1)} seconds.`;
@@ -282,6 +341,7 @@
                     localStorage.setItem('gmailShortcutBestTime', bestTime);
                     bestTimeEl.textContent = `${bestTime}s`;
                     endMessage += ' 🎉 New Best Time!';
+                    submitScoreModal.classList.remove('hidden'); // Show submit modal
                 }
                 
                 instructionText.textContent = endMessage;
@@ -293,7 +353,6 @@
                 gameUi.classList.add('hidden');
                 endGameControls.classList.add('hidden');
                 gameSetup.classList.remove('hidden');
-                startButton.classList.remove('hidden');
                 subtitle.textContent = 'Select the shortcuts you want to practice.';
                 timerEl.textContent = "0.0s";
                 completedChallenges = 0;
@@ -302,21 +361,8 @@
 
             const handleCorrectAnswer = () => {
                 showFeedback(true);
-                
-                if (['v', 'l'].includes(activeChallenge.key)) {
-                    const action = activeChallenge.key === 'v' ? 'Move to...' : 'Label as...';
-                    modalTitle.textContent = action;
-                    actionModal.classList.remove('hidden');
-                    actionModal.classList.add('flex');
-                } else if (activeChallenge.key === 'shift + t') {
-                    modalTitle.textContent = 'Task Created!';
-                    actionModal.classList.remove('hidden');
-                    actionModal.classList.add('flex');
-                }
-
                 setTimeout(() => {
                     feedbackOverlay.classList.add('hidden');
-                    actionModal.classList.add('hidden');
                     nextChallenge();
                 }, 800);
             };
@@ -331,18 +377,15 @@
             const showFeedback = (isCorrect, pressedKey = '') => {
                 feedbackOverlay.classList.remove('hidden');
                 feedbackOverlay.classList.add('flex', 'feedback-animation');
-                
                 if (isCorrect) {
                     feedbackIcon.innerHTML = '✅';
                     feedbackIcon.style.color = '#10B981';
                     feedbackText.textContent = 'Correct!';
-                    feedbackText.style.color = '#10B981';
                     feedbackHint.innerHTML = '';
                 } else {
                     feedbackIcon.innerHTML = '❌';
                     feedbackIcon.style.color = '#EF4444';
                     feedbackText.textContent = 'Not quite!';
-                    feedbackText.style.color = '#EF4444';
                     feedbackHint.innerHTML = `You pressed <span class="shortcut-key">${pressedKey}</span>. The correct shortcut is <span class="shortcut-key">${activeChallenge.key}</span>.`;
                 }
             };
@@ -350,19 +393,77 @@
             const updateProgress = () => {
                 progressEl.textContent = `${completedChallenges}/${CHALLENGE_COUNT}`;
             };
+            
+            // --- Leaderboard Logic ---
+            const showLeaderboard = async () => {
+                leaderboardModal.classList.remove('hidden');
+                leaderboardLoading.classList.remove('hidden');
+                leaderboardBody.innerHTML = '';
+
+                try {
+                    const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
+                    const snapshot = await getDocs(leaderboardCol);
+                    const scores = snapshot.docs.map(doc => doc.data());
+
+                    scores.sort((a, b) => a.time - b.time);
+
+                    const top10 = scores.slice(0, 10);
+                    
+                    leaderboardBody.innerHTML = top10.map((score, index) => `
+                        <tr class="border-b">
+                            <td class="p-2">${index + 1}</td>
+                            <td class="p-2">${score.name}</td>
+                            <td class="p-2">${score.time.toFixed(1)}</td>
+                        </tr>
+                    `).join('');
+
+                } catch (err) {
+                    console.error("Error fetching leaderboard: ", err);
+                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Could not load leaderboard.</td></tr>`;
+                } finally {
+                    leaderboardLoading.classList.add('hidden');
+                }
+            };
+
+            const submitScore = async () => {
+                const playerName = playerNameInput.value.trim();
+                if (!playerName) {
+                    alert("Please enter a name.");
+                    return;
+                }
+
+                submitScoreButton.disabled = true;
+                submitScoreButton.textContent = "Submitting...";
+                
+                try {
+                    const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
+                    await addDoc(leaderboardCol, {
+                        name: playerName,
+                        time: lastGameTime,
+                        createdAt: serverTimestamp()
+                    });
+                } catch(err) {
+                    console.error("Error submitting score: ", err);
+                } finally {
+                    submitScoreModal.classList.add('hidden');
+                    submitScoreButton.disabled = false;
+                    submitScoreButton.textContent = "Submit Score";
+                    playerNameInput.value = '';
+                }
+            };
 
             // --- Event Listeners ---
             startButton.addEventListener('click', startGame);
             playAgainButton.addEventListener('click', resetToSetup);
+            leaderboardButton.addEventListener('click', showLeaderboard);
+            closeLeaderboardButton.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
+            submitScoreButton.addEventListener('click', submitScore);
 
             document.addEventListener('keydown', (e) => {
                 if (!gameActive || e.repeat) return;
                 
-                if (e.key !== 'F5' && e.key !== 'F12') {
-                    e.preventDefault();
-                }
-
-                // Handle special cases for shift+number keys
+                if (e.key !== 'F5' && e.key !== 'F12') e.preventDefault();
+                
                 let correctCode = activeChallenge.code;
                 if (activeChallenge.key === '#') correctCode = 'Digit3';
                 if (activeChallenge.key === '!') correctCode = 'Digit1';
@@ -370,19 +471,13 @@
                 if (e.code === correctCode && e.shiftKey === activeChallenge.shift) {
                     handleCorrectAnswer();
                 } else {
-                    let pressed = '';
-                    if (e.shiftKey) pressed += 'shift + ';
-                    if (e.ctrlKey) pressed += 'ctrl + ';
-                    if (e.altKey) pressed += 'alt + ';
-                    pressed += e.key.toLowerCase();
-                    
+                    let pressed = (e.shiftKey ? 'shift + ' : '') + (e.ctrlKey ? 'ctrl + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
                     if (!['shift', 'control', 'alt'].includes(e.key.toLowerCase())) {
                        handleWrongAnswer(pressed);
                     }
                 }
             });
 
-            // Load high score on initial page load
             initializeSetup();
         });
     </script>
