@@ -31,17 +31,34 @@
             80% { transform: scale(1.05); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
+        /* Custom checkbox style */
+        .shortcut-checkbox:checked + label {
+            border-color: #3B82F6;
+            background-color: #EFF6FF;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
     <div id="game-container" class="w-full max-w-4xl mx-auto">
         <div class="text-center mb-6">
             <h1 class="text-4xl font-bold text-gray-800">Gmail Shortcut Challenge</h1>
-            <p class="text-gray-600 mt-2">Press the correct key to complete the action. How fast can you go?</p>
+            <p id="subtitle" class="text-gray-600 mt-2">Select the shortcuts you want to practice.</p>
         </div>
 
+        <!-- Game Setup Screen -->
+        <div id="game-setup" class="bg-white rounded-lg shadow-xl p-6">
+            <h2 class="text-2xl font-bold text-center mb-4">Choose Your Challenge</h2>
+            <div id="shortcut-selection" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+                <!-- Checkboxes will be dynamically inserted here -->
+            </div>
+            <div class="text-center">
+                 <button id="start-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Start Timed Challenge</button>
+            </div>
+             <p id="selection-error" class="text-red-500 text-center mt-4 hidden">Please select at least one shortcut to practice.</p>
+        </div>
+        
         <!-- Game UI -->
-        <div class="bg-white rounded-lg shadow-xl p-6 relative">
+        <div id="game-ui" class="bg-white rounded-lg shadow-xl p-6 relative hidden">
             <!-- Score and Instruction -->
             <div class="flex justify-between items-center mb-4 border-b pb-4">
                 <div id="instruction-card" class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md w-full">
@@ -50,16 +67,16 @@
                 </div>
                  <div class="text-right ml-4 flex-shrink-0 space-y-2">
                     <div>
-                        <div class="text-sm text-gray-500">SCORE</div>
-                        <div id="score" class="text-3xl font-bold text-gray-800">0</div>
+                        <div class="text-sm text-gray-500">PROGRESS</div>
+                        <div id="progress" class="text-3xl font-bold text-gray-800">0/15</div>
                     </div>
                     <div>
                         <div class="text-sm text-gray-500">TIME</div>
-                        <div id="timer" class="text-3xl font-bold text-gray-800">60</div>
+                        <div id="timer" class="text-3xl font-bold text-gray-800">0.0s</div>
                     </div>
                      <div>
-                        <div class="text-sm text-gray-500">BEST</div>
-                        <div id="high-score" class="text-3xl font-bold text-gray-800">0</div>
+                        <div class="text-sm text-gray-500">BEST TIME</div>
+                        <div id="best-time" class="text-3xl font-bold text-gray-800">-</div>
                     </div>
                 </div>
             </div>
@@ -79,8 +96,6 @@
                 </div>
                 <div id="email-body" class="text-gray-600 leading-relaxed">
                     <p>This is a simulated Gmail inbox. An instruction will appear at the top. Your job is to press the correct keyboard shortcut to perform that action.</p>
-                    <p class="mt-4">For example, if it says "Compose a new email", you would press the 'c' key.</p>
-                    <p class="mt-4">Good luck!</p>
                 </div>
             </div>
 
@@ -98,9 +113,9 @@
                 </div>
             </div>
         </div>
-        
-        <div class="text-center mt-6">
-            <button id="start-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Start Game</button>
+
+        <div id="end-game-controls" class="text-center mt-6 hidden">
+             <button id="play-again-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Play Again</button>
         </div>
     </div>
 
@@ -108,10 +123,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- DOM Elements ---
             const instructionText = document.getElementById('instruction-text');
-            const scoreEl = document.getElementById('score');
+            const progressEl = document.getElementById('progress');
             const timerEl = document.getElementById('timer');
-            const highScoreEl = document.getElementById('high-score');
+            const bestTimeEl = document.getElementById('best-time');
             const startButton = document.getElementById('start-button');
+            const playAgainButton = document.getElementById('play-again-button');
             const feedbackOverlay = document.getElementById('feedback-overlay');
             const feedbackIcon = document.getElementById('feedback-icon');
             const feedbackText = document.getElementById('feedback-text');
@@ -123,26 +139,41 @@
             const emailLabels = document.getElementById('email-labels');
             const actionModal = document.getElementById('action-modal');
             const modalTitle = document.getElementById('modal-title');
+            const gameSetup = document.getElementById('game-setup');
+            const gameUi = document.getElementById('game-ui');
+            const subtitle = document.getElementById('subtitle');
+            const shortcutSelectionContainer = document.getElementById('shortcut-selection');
+            const selectionError = document.getElementById('selection-error');
+            const endGameControls = document.getElementById('end-game-controls');
             
             // --- Game State ---
-            let score = 0;
-            let highScore = 0;
+            let bestTime = null;
             let activeChallenge = null;
             let gameActive = false;
             let challenges = [];
             let timerInterval = null;
-            let timeLeft = 60;
-            const TIME_LIMIT = 60;
-            
+            let startTime = 0;
+            let completedChallenges = 0;
+            const CHALLENGE_COUNT = 15;
+
             // --- Game Data ---
-            const shortcuts = [
-                { key: 'e', code: 'KeyE', shift: false, description: 'Archive this email' },
-                { key: 'v', code: 'KeyV', shift: false, description: 'Move this email' },
-                { key: 'shift + t', code: 'KeyT', shift: true, description: 'Create a task from this email' },
-                { key: 'l', code: 'KeyL', shift: false, description: 'Label this email' },
-                { key: 'r', code: 'KeyR', shift: false, description: 'Reply to this email' },
-                { key: 'a', code: 'KeyA', shift: false, description: 'Reply to all' },
-                { key: 'c', code: 'KeyC', shift: false, description: 'Compose a new email' }
+            const allShortcuts = [
+                { key: 'c', code: 'KeyC', shift: false, description: 'Compose' },
+                { key: 'd', code: 'KeyD', shift: false, description: 'Compose in new tab' },
+                { key: 'r', code: 'KeyR', shift: false, description: 'Reply' },
+                { key: 'a', code: 'KeyA', shift: false, description: 'Reply all' },
+                { key: 'e', code: 'KeyE', shift: false, description: 'Archive' },
+                { key: 'l', code: 'KeyL', shift: false, description: 'Label' },
+                { key: 'v', code: 'KeyV', shift: false, description: 'Move' },
+                { key: 's', code: 'KeyS', shift: false, description: 'Star' },
+                { key: '#', code: 'Digit3', shift: true, description: 'Delete' }, // Note: '#' is often Shift+3
+                { key: '!', code: 'Digit1', shift: true, description: 'Report as spam' }, // Note: '!' is often Shift+1
+                { key: 'z', code: 'KeyZ', shift: false, description: 'Undo' },
+                { key: 'shift + t', code: 'KeyT', shift: true, description: 'Create task' },
+                { key: 'j', code: 'KeyJ', shift: false, description: 'Go to next message' },
+                { key: 'k', code: 'KeyK', shift: false, description: 'Go to previous message' },
+                { key: 'o', code: 'KeyO', shift: false, description: 'Open message' },
+                { key: 'u', code: 'KeyU', shift: false, description: 'Back to threadlist' },
             ];
 
             const mockEmails = [
@@ -154,31 +185,67 @@
             ];
 
             // --- Initial Setup ---
-            const loadHighScore = () => {
-                highScore = localStorage.getItem('gmailShortcutHighScore') || 0;
-                highScoreEl.textContent = highScore;
+            const initializeSetup = () => {
+                loadBestTime();
+                shortcutSelectionContainer.innerHTML = '';
+                allShortcuts.forEach((sc, index) => {
+                    const div = document.createElement('div');
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = `sc-${index}`;
+                    input.value = index;
+                    input.checked = true;
+                    input.className = 'hidden shortcut-checkbox';
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `sc-${index}`;
+                    label.className = 'block border-2 border-gray-300 rounded-lg p-3 text-center cursor-pointer transition-all duration-200';
+                    label.innerHTML = `<span class="font-bold text-lg">${sc.key}</span><br><span class="text-sm text-gray-600">${sc.description}</span>`;
+                    
+                    div.appendChild(input);
+                    div.appendChild(label);
+                    shortcutSelectionContainer.appendChild(div);
+                });
+            };
+
+            const loadBestTime = () => {
+                bestTime = localStorage.getItem('gmailShortcutBestTime');
+                bestTimeEl.textContent = bestTime ? `${parseFloat(bestTime).toFixed(1)}s` : '-';
             };
             
             // --- Game Logic ---
             const startGame = () => {
-                score = 0;
-                gameActive = true;
-                timeLeft = TIME_LIMIT;
-                timerEl.textContent = timeLeft;
-                clearInterval(timerInterval);
-
-                // Shuffle and create a queue of challenges
-                challenges = [...shortcuts, ...shortcuts, ...shortcuts].sort(() => Math.random() - 0.5); // Repeat list to fill time
-                updateScore();
-                startButton.textContent = 'Restart Game';
+                const selectedIndexes = Array.from(shortcutSelectionContainer.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
                 
+                if (selectedIndexes.length === 0) {
+                    selectionError.classList.remove('hidden');
+                    return;
+                }
+                selectionError.classList.add('hidden');
+
+                const selectedShortcuts = selectedIndexes.map(i => allShortcuts[i]);
+                
+                challenges = [];
+                for(let i=0; i < CHALLENGE_COUNT; i++) {
+                    challenges.push(selectedShortcuts[Math.floor(Math.random() * selectedShortcuts.length)]);
+                }
+
+                gameActive = true;
+                completedChallenges = 0;
+                updateProgress();
+                
+                gameSetup.classList.add('hidden');
+                startButton.classList.add('hidden');
+                gameUi.classList.remove('hidden');
+                endGameControls.classList.add('hidden');
+                subtitle.textContent = "Press the correct key to complete the action. How fast can you go?";
+
+
+                startTime = Date.now();
                 timerInterval = setInterval(() => {
-                    timeLeft--;
-                    timerEl.textContent = timeLeft;
-                    if (timeLeft <= 0) {
-                        endGame();
-                    }
-                }, 1000);
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    timerEl.textContent = `${elapsed.toFixed(1)}s`;
+                }, 100);
 
                 nextChallenge();
             };
@@ -188,12 +255,12 @@
                     endGame();
                     return;
                 }
+                completedChallenges++;
+                updateProgress();
 
-                // Get the next challenge from the queue
                 activeChallenge = challenges.pop();
                 const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
 
-                // Update UI
                 instructionText.textContent = activeChallenge.description;
                 emailSubject.textContent = email.subject;
                 emailSender.textContent = email.sender;
@@ -204,31 +271,38 @@
             
             const endGame = () => {
                 clearInterval(timerInterval);
+                const finalTime = (Date.now() - startTime) / 1000;
                 gameActive = false;
                 
-                let endMessage = `Time's up! Final score: ${score}`;
+                timerEl.textContent = `${finalTime.toFixed(1)}s`;
+                let endMessage = `Finished! Your time: ${finalTime.toFixed(1)} seconds.`;
 
-                // Check for new high score
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem('gmailShortcutHighScore', highScore);
-                    highScoreEl.textContent = highScore;
-                    endMessage += ' 🎉 New High Score!';
+                if (bestTime === null || finalTime < parseFloat(bestTime)) {
+                    bestTime = finalTime.toFixed(1);
+                    localStorage.setItem('gmailShortcutBestTime', bestTime);
+                    bestTimeEl.textContent = `${bestTime}s`;
+                    endMessage += ' 🎉 New Best Time!';
                 }
                 
                 instructionText.textContent = endMessage;
-                startButton.textContent = 'Play Again';
-                emailSubject.textContent = 'Time is up!';
-                emailAvatar.textContent = '⏰';
-                emailBody.innerHTML = `<p>You managed to get ${score} correct answers. ${score > highScore ? 'You set a new high score!' : `Your best is ${highScore}.`} Try again!</p>`;
-            }
+                subtitle.textContent = "Great job! Click 'Play Again' to try and beat your best time.";
+                endGameControls.classList.remove('hidden');
+            };
+
+            const resetToSetup = () => {
+                gameUi.classList.add('hidden');
+                endGameControls.classList.add('hidden');
+                gameSetup.classList.remove('hidden');
+                startButton.classList.remove('hidden');
+                subtitle.textContent = 'Select the shortcuts you want to practice.';
+                timerEl.textContent = "0.0s";
+                completedChallenges = 0;
+                updateProgress();
+            };
 
             const handleCorrectAnswer = () => {
-                score++;
-                updateScore();
                 showFeedback(true);
                 
-                // Show a quick modal for certain actions
                 if (['v', 'l'].includes(activeChallenge.key)) {
                     const action = activeChallenge.key === 'v' ? 'Move to...' : 'Label as...';
                     modalTitle.textContent = action;
@@ -240,19 +314,18 @@
                     actionModal.classList.add('flex');
                 }
 
-
                 setTimeout(() => {
                     feedbackOverlay.classList.add('hidden');
                     actionModal.classList.add('hidden');
                     nextChallenge();
-                }, 1200);
+                }, 800);
             };
 
             const handleWrongAnswer = (pressedKey) => {
                 showFeedback(false, pressedKey);
                 setTimeout(() => {
                     feedbackOverlay.classList.add('hidden');
-                }, 1500);
+                }, 1200);
             };
 
             const showFeedback = (isCorrect, pressedKey = '') => {
@@ -274,22 +347,27 @@
                 }
             };
             
-            const updateScore = () => {
-                scoreEl.textContent = score;
+            const updateProgress = () => {
+                progressEl.textContent = `${completedChallenges}/${CHALLENGE_COUNT}`;
             };
 
             // --- Event Listeners ---
             startButton.addEventListener('click', startGame);
+            playAgainButton.addEventListener('click', resetToSetup);
 
             document.addEventListener('keydown', (e) => {
                 if (!gameActive || e.repeat) return;
                 
-                // Prevent browser shortcuts from firing (e.g., Ctrl+R)
                 if (e.key !== 'F5' && e.key !== 'F12') {
                     e.preventDefault();
                 }
 
-                if (e.code === activeChallenge.code && e.shiftKey === activeChallenge.shift) {
+                // Handle special cases for shift+number keys
+                let correctCode = activeChallenge.code;
+                if (activeChallenge.key === '#') correctCode = 'Digit3';
+                if (activeChallenge.key === '!') correctCode = 'Digit1';
+
+                if (e.code === correctCode && e.shiftKey === activeChallenge.shift) {
                     handleCorrectAnswer();
                 } else {
                     let pressed = '';
@@ -298,7 +376,6 @@
                     if (e.altKey) pressed += 'alt + ';
                     pressed += e.key.toLowerCase();
                     
-                    // Don't penalize for pressing just 'shift', 'ctrl', etc.
                     if (!['shift', 'control', 'alt'].includes(e.key.toLowerCase())) {
                        handleWrongAnswer(pressed);
                     }
@@ -306,7 +383,7 @@
             });
 
             // Load high score on initial page load
-            loadHighScore();
+            initializeSetup();
         });
     </script>
 </body>
