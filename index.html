@@ -408,12 +408,18 @@
 
                 try {
                     const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
-                    const q = query(leaderboardCol, orderBy("time", "asc"), limit(10));
-                    const snapshot = await getDocs(q);
+                    // Fetch all documents without ordering
+                    const snapshot = await getDocs(leaderboardCol);
                     
                     const scores = snapshot.docs.map(doc => doc.data());
+
+                    // Sort the scores in the browser
+                    scores.sort((a, b) => a.time - b.time);
                     
-                    leaderboardBody.innerHTML = scores.map((score, index) => `
+                    // Get the top 10
+                    const top10 = scores.slice(0, 10);
+                    
+                    leaderboardBody.innerHTML = top10.map((score, index) => `
                         <tr class="border-b">
                             <td class="p-2 font-bold">${index + 1}</td>
                             <td class="p-2">${score.name}</td>
