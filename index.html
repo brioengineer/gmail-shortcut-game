@@ -154,7 +154,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Firebase Setup ---
@@ -227,23 +227,25 @@
 
             // --- Game Data ---
             const allShortcuts = [
-                { key: 'c', code: 'KeyC', shift: false, description: 'Compose' },
-                { key: 'd', code: 'KeyD', shift: false, description: 'Compose in new tab' },
-                { key: 'r', code: 'KeyR', shift: false, description: 'Reply' },
-                { key: 'a', code: 'KeyA', shift: false, description: 'Reply all' },
-                { key: 'e', code: 'KeyE', shift: false, description: 'Archive' },
-                { key: 'l', code: 'KeyL', shift: false, description: 'Label' },
-                { key: 'v', code: 'KeyV', shift: false, description: 'Move' },
-                { key: 's', code: 'KeyS', shift: false, description: 'Star' },
-                { key: '#', code: 'Digit3', shift: true, description: 'Delete' },
-                { key: '!', code: 'Digit1', shift: true, description: 'Report spam' },
-                { key: 'z', code: 'KeyZ', shift: false, description: 'Undo' },
-                { key: 'shift + t', code: 'KeyT', shift: true, description: 'Create task' },
-                { key: 'j', code: 'KeyJ', shift: false, description: 'Next message' },
-                { key: 'k', code: 'KeyK', shift: false, description: 'Previous message' },
-                { key: 'o', code: 'KeyO', shift: false, description: 'Open message' },
-                { key: 'u', code: 'KeyU', shift: false, description: 'Back to threadlist' },
-                { key: '/', code: 'Slash', shift: false, description: 'Search mail' },
+                { key: 'c', code: 'KeyC', shift: false, ctrl: false, description: 'Compose' },
+                { key: 'd', code: 'KeyD', shift: false, ctrl: false, description: 'Compose in new tab' },
+                { key: 'r', code: 'KeyR', shift: false, ctrl: false, description: 'Reply' },
+                { key: 'a', code: 'KeyA', shift: false, ctrl: false, description: 'Reply all' },
+                { key: 'e', code: 'KeyE', shift: false, ctrl: false, description: 'Archive' },
+                { key: 'l', code: 'KeyL', shift: false, ctrl: false, description: 'Label' },
+                { key: 'v', code: 'KeyV', shift: false, ctrl: false, description: 'Move' },
+                { key: 's', code: 'KeyS', shift: false, ctrl: false, description: 'Star' },
+                { key: 'b', code: 'KeyB', shift: false, ctrl: false, description: 'Snooze' },
+                { key: '#', code: 'Digit3', shift: true, ctrl: false, description: 'Delete' },
+                { key: '!', code: 'Digit1', shift: true, ctrl: false, description: 'Report spam' },
+                { key: 'z', code: 'KeyZ', shift: false, ctrl: false, description: 'Undo' },
+                { key: 'shift + t', code: 'KeyT', shift: true, ctrl: false, description: 'Create task' },
+                { key: 'j', code: 'KeyJ', shift: false, ctrl: false, description: 'Next message' },
+                { key: 'k', code: 'KeyK', shift: false, ctrl: false, description: 'Previous message' },
+                { key: 'o', code: 'KeyO', shift: false, ctrl: false, description: 'Open message' },
+                { key: 'u', code: 'KeyU', shift: false, ctrl: false, description: 'Back to threadlist' },
+                { key: '/', code: 'Slash', shift: false, ctrl: false, description: 'Search mail' },
+                { key: 'ctrl + k', code: 'KeyK', shift: false, ctrl: true, description: 'Insert hyperlink' },
                 { key: 'g then i', sequence: ['KeyG', 'KeyI'], description: 'Go to Inbox' },
             ];
 
@@ -408,15 +410,11 @@
 
                 try {
                     const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
-                    // Fetch all documents without ordering
                     const snapshot = await getDocs(leaderboardCol);
                     
                     const scores = snapshot.docs.map(doc => doc.data());
-
-                    // Sort the scores in the browser
                     scores.sort((a, b) => a.time - b.time);
                     
-                    // Get the top 10
                     const top10 = scores.slice(0, 10);
                     
                     leaderboardBody.innerHTML = top10.map((score, index) => `
@@ -499,10 +497,10 @@
                     if (activeChallenge.key === '#') correctCode = 'Digit3';
                     if (activeChallenge.key === '!') correctCode = 'Digit1';
 
-                    if (e.code === correctCode && e.shiftKey === activeChallenge.shift) {
+                    if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeChallenge.ctrl) {
                         handleCorrectAnswer();
                     } else {
-                        let pressed = (e.shiftKey ? 'shift + ' : '') + (e.ctrlKey ? 'ctrl + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
+                        let pressed = (e.ctrlKey ? 'ctrl + ' : '') + (e.shiftKey ? 'shift + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
                         if (!['shift', 'control', 'alt', 'meta'].includes(e.key.toLowerCase())) {
                            handleWrongAnswer(pressed);
                         }
