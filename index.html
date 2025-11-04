@@ -1,5 +1,5 @@
 <script type="module">
-    // --- Step 1: IMPORT your new config file ---
+    // --- Step 1: IMPORT your config file (with the correct './' path) ---
     import { firebaseConfig } from './firebase-config.js';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -20,7 +20,7 @@
         // --- Firebase Setup ---
         let db, auth;
         try {
-            // --- Step 2: USE your new config file ---
+            // --- Step 2: USE your imported config variable ---
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
@@ -92,7 +92,6 @@
             { key: 'v', code: 'KeyV', shift: false, ctrl: false, description: 'Move' },
             { key: 's', code: 'KeyS', shift: false, ctrl: false, description: 'Star' },
             { key: 'b', code: 'KeyB', shift: false, ctrl: false, description: 'Snooze' },
-            // --- THIS IS THE TYPO I FIXED (Digit3L -> Digit3) ---
             { key: '#', code: 'Digit3', shift: true, ctrl: false, description: 'Delete' },
             { key: '!', code: 'Digit1', shift: true, ctrl: false, description: 'Report spam' },
             { key: 'z', code: 'KeyZ', shift: false, ctrl: false, description: 'Undo' },
@@ -270,7 +269,7 @@ localStorage.setItem('gmailShortcutBestTime', bestTime);
                 return;
             }
             
-            leaderbanderModal.classList.remove('hidden');
+            leaderboardModal.classList.remove('hidden');
             leaderboardLoading.classList.remove('hidden');
             leaderboardBody.innerHTML = '';
 
@@ -372,7 +371,7 @@ localStorage.setItem('gmailShortcutBestTime', bestTime);
                 
                 let correctCode = activeChallenge.code;
 
-                if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeCode.ctrl) {
+                if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeChallenge.ctrl) {
                     handleCorrectAnswer();
                 } else {
                     let pressed = (e.ctrlKey ? 'ctrl + ' : '') + (e.shiftKey ? 'shift + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
