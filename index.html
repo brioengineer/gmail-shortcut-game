@@ -148,6 +148,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js"; // <-- ADD THIS
         import { 
             getFirestore, 
             collection, 
@@ -168,6 +169,8 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                const analytics = getAnalytics(app); // <-- ADD THIS
+                
                 await signInAnonymously(auth);
 
             } catch (error) {
