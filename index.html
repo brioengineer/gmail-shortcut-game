@@ -1,5 +1,5 @@
 <script type="module">
-    // --- Step 1: IMPORT your config file (with the correct './' path) ---
+    // --- Step 1: IMPORT your new config file ---
     import { firebaseConfig } from './firebase-config.js';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -20,7 +20,7 @@
         // --- Firebase Setup ---
         let db, auth;
         try {
-            // --- Step 2: USE your imported config variable ---
+            // --- Step 2: USE your new config file ---
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
@@ -269,12 +269,13 @@ localStorage.setItem('gmailShortcutBestTime', bestTime);
                 return;
             }
             
+            // --- FIX: 'leaderboardModal' ---
             leaderboardModal.classList.remove('hidden');
             leaderboardLoading.classList.remove('hidden');
             leaderboardBody.innerHTML = '';
 
             try {
-                // --- Step 3: USE the simple collection path ---
+                // --- USE the simple collection path ---
                 const leaderboardCol = collection(db, "leaderboard");
                 
                 const scoresQuery = query(leaderboardCol, orderBy("time", "asc"), limit(10));
@@ -315,7 +316,7 @@ localStorage.setItem('gmailShortcutBestTime', bestTime);
             submitScoreButton.textContent = "Submitting...";
             
             try {
-                // --- Step 3: USE the simple collection path ---
+                // --- USE the simple collection path ---
                 const leaderboardCol = collection(db, "leaderboard");
                 await addDoc(leaderboardCol, {
                     name: playerName,
@@ -371,6 +372,7 @@ localStorage.setItem('gmailShortcutBestTime', bestTime);
                 
                 let correctCode = activeChallenge.code;
 
+                // --- FIX: 'activeChallenge.ctrl' ---
                 if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeChallenge.ctrl) {
                     handleCorrectAnswer();
                 } else {
