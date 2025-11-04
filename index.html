@@ -1,160 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gmail Shortcut Challenge</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .shortcut-key {
-            display: inline-block;
-            padding: 0.25rem 0.6rem;
-            border: 1px solid #ccc;
-            border-radius: 0.3rem;
-            background-color: #f7f7f7;
-            box-shadow: 0 2px 0 #ccc;
-            font-weight: 500;
-            color: #333;
-            margin: 0 0.25rem;
-        }
-        .feedback-animation {
-            animation: pop-in 0.3s ease-out;
-        }
-        @keyframes pop-in {
-            0% { transform: scale(0.8); opacity: 0; }
-            80% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .shortcut-checkbox:checked + label {
-            border-color: #3B82F6;
-            background-color: #EFF6FF;
-        }
-        .modal-backdrop {
-            background-color: rgba(0,0,0,0.5);
-        }
-    </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div id="game-container" class="w-full max-w-4xl mx-auto">
-        <div class="text-center mb-6">
-            <h1 class="text-4xl font-bold text-gray-800">Gmail Shortcut Challenge</h1>
-            <p id="subtitle" class="text-gray-600 mt-2">Select the shortcuts you want to practice.</p>
-        </div>
+<script type="module">
 
-        <!-- Game Setup Screen -->
-        <div id="game-setup" class="bg-white rounded-lg shadow-xl p-6">
-            <h2 class="text-2xl font-bold text-center mb-4">Choose Your Challenge</h2>
-            <div id="shortcut-selection" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
-                <!-- Checkboxes will be dynamically inserted here -->
-            </div>
-            <div class="flex justify-center items-center gap-4">
-                 <button id="start-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Start Timed Challenge</button>
-                 <button id="leaderboard-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">View Leaderboard</button>
-            </div>
-             <p id="selection-error" class="text-red-500 text-center mt-4 hidden">Please select at least one shortcut to practice.</p>
-        </div>
-        
-        <!-- Game UI -->
-        <div id="game-ui" class="bg-white rounded-lg shadow-xl p-6 relative hidden">
-            <!-- Score and Instruction -->
-            <div class="flex justify-between items-center mb-4 border-b pb-4">
-                <div id="instruction-card" class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md w-full">
-                    <p class="font-bold">Your task:</p>
-                    <p id="instruction-text" class="text-lg">Click "Start Game" to begin!</p>
-                </div>
-                 <div class="text-right ml-4 flex-shrink-0 space-y-2">
-                    <div>
-                        <div class="text-sm text-gray-500">PROGRESS</div>
-                        <div id="progress" class="text-3xl font-bold text-gray-800">0/15</div>
-                    </div>
-                    <div>
-                        <div class="text-sm text-gray-500">TIME</div>
-                        <div id="timer" class="text-3xl font-bold text-gray-800">0.0s</div>
-                    </div>
-                     <div>
-                        <div class="text-sm text-gray-500">BEST TIME</div>
-                        <div id="best-time" class="text-3xl font-bold text-gray-800">-</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mock Email -->
-            <div id="email-view">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 id="email-subject" class="text-2xl font-semibold text-gray-800">Welcome to the Challenge!</h2>
-                </div>
-                <div class="flex items-center space-x-3 mb-6">
-                    <div class="w-10 h-10 bg-green-500 text-white flex items-center justify-center rounded-full font-bold" id="email-avatar">G</div>
-                    <div>
-                        <div class="font-bold text-gray-700" id="email-sender">Game Master</div>
-                        <div class="text-sm text-gray-500">to me</div>
-                    </div>
-                </div>
-                <div id="email-body" class="text-gray-600 leading-relaxed">
-                    <p>An instruction will appear at the top. Your job is to press the correct keyboard shortcut.</p>
-                </div>
-            </div>
-
-            <!-- Feedback Overlay -->
-            <div id="feedback-overlay" class="absolute inset-0 bg-white bg-opacity-80 flex-col items-center justify-center rounded-lg text-center p-8 hidden">
-                <div id="feedback-icon" class="text-6xl mb-4"></div>
-                <div id="feedback-text" class="text-3xl font-bold"></div>
-                <div id="feedback-hint" class="text-lg text-gray-600 mt-2"></div>
-            </div>
-        </div>
-
-        <div id="end-game-controls" class="text-center mt-6 hidden">
-             <button id="play-again-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Play Again</button>
-        </div>
-    </div>
-
-    <!-- Leaderboard Modal -->
-    <div id="leaderboard-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
-            <div class="flex justify-between items-center border-b p-4">
-                <h3 class="text-2xl font-bold">Top 10 Players</h3>
-                <button id="close-leaderboard-button" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
-            </div>
-            <div class="p-6">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr>
-                            <th class="p-2">Rank</th>
-                            <th class="p-2">Name</th>
-                            <th class="p-2">Time (s)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard-body">
-                        <!-- Scores will be inserted here -->
-                    </tbody>
-                </table>
-                <p id="leaderboard-loading" class="text-center text-gray-500 mt-4">Loading...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Submit Score Modal -->
-    <div id="submit-score-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
-            <h3 class="text-2xl font-bold mb-2">New Best Time!</h3>
-            <p class="text-gray-600 mb-4">Enter your name to join the leaderboard.</p>
-            <input type="text" id="player-name-input" placeholder="Your Name" class="w-full border-2 border-gray-300 rounded-md p-2 mb-4 focus:border-blue-500 focus:outline-none">
-            <p id="player-name-error" class="text-red-500 text-sm mb-2 hidden">Please enter a name.</p>
-            <button id="submit-score-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg w-full">Submit Score</button>
-            <button id="cancel-submit-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg w-full mt-2">Cancel</button>
-        </div>
-    </div>
-    
-    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- IMPORT query, orderBy, and limit ---
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            serverTimestamp, 
+            setLogLevel,
+            query,
+            orderBy,
+            limit
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Firebase Setup ---
@@ -165,7 +24,7 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                setLogLevel('debug');
+                // setLogLevel('debug'); // You can uncomment this if you're still debugging
 
                 if (typeof __initial_auth_token !== 'undefined') {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -174,6 +33,8 @@
                 }
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
+                // Display a user-friendly error
+                document.getElementById('subtitle').textContent = "Error: Could not connect to game server.";
             }
 
             // --- DOM Elements ---
@@ -323,16 +184,20 @@
                     endGame();
                     return;
                 }
-                completedChallenges++;
-                updateProgress();
-
-                activeChallenge = challenges.pop();
+                
+                activeChallenge = challenges[challenges.length - 1 - completedChallenges]; // Get next challenge
                 const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
                 instructionText.textContent = activeChallenge.description;
                 emailSubject.textContent = email.subject;
                 emailSender.textContent = email.sender;
                 emailAvatar.textContent = email.sender.charAt(0).toUpperCase();
                 emailBody.innerHTML = `<p>${email.body}</p>`;
+                
+                // --- BUG FIX ---
+                // You were incrementing this in nextChallenge, but it should be
+                // incremented in handleCorrectAnswer. I've moved it.
+                // completedChallenges++; 
+                // updateProgress();
             };
             
             const endGame = () => {
@@ -349,7 +214,10 @@
                     localStorage.setItem('gmailShortcutBestTime', bestTime);
                     bestTimeEl.textContent = `${bestTime}s`;
                     endMessage += ' 🎉 New Best Time!';
-                    submitScoreModal.classList.remove('hidden'); // Show submit modal
+                    // Only show submit modal if Firebase initialized
+                    if(db) {
+                        submitScoreModal.classList.remove('hidden'); 
+                    }
                 }
                 
                 instructionText.textContent = endMessage;
@@ -364,14 +232,19 @@
                 subtitle.textContent = 'Select the shortcuts you want to practice.';
                 timerEl.textContent = "0.0s";
                 completedChallenges = 0;
-                updateProgress();
+                updateProgress(); // Reset progress to 0/15
+                instructionText.textContent = 'Click "Start Game" to begin!'; // Reset instruction
             };
 
             const handleCorrectAnswer = () => {
+                // Increment score *after* getting it right
+                completedChallenges++;
+                updateProgress();
+
                 showFeedback(true);
                 setTimeout(() => {
                     feedbackOverlay.classList.add('hidden');
-                    nextChallenge();
+                    nextChallenge(); // Load the next challenge
                 }, 800);
             };
 
@@ -402,38 +275,53 @@
                 progressEl.textContent = `${completedChallenges}/${CHALLENGE_COUNT}`;
             };
             
-            // --- Leaderboard Logic ---
+            // --- Leaderboard Logic (OPTIMIZED) ---
             const showLeaderboard = async () => {
+                if (!db) {
+                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Error: Leaderboard is not available.</td></tr>`;
+                    return;
+                }
+                
                 leaderboardModal.classList.remove('hidden');
                 leaderboardLoading.classList.remove('hidden');
                 leaderboardBody.innerHTML = '';
 
                 try {
                     const leaderboardCol = collection(db, `/artifacts/${appId}/public/data/leaderboard`);
-                    const snapshot = await getDocs(leaderboardCol);
                     
+                    // --- CHANGE ---
+                    // Create a query to sort on the server and limit to 10
+                    const scoresQuery = query(leaderboardCol, orderBy("time", "asc"), limit(10));
+                    
+                    // Execute the query
+                    const snapshot = await getDocs(scoresQuery);
+                    
+                    // The rest of your logic was correct, but snapshot.docs is already sorted!
                     const scores = snapshot.docs.map(doc => doc.data());
-                    scores.sort((a, b) => a.time - b.time);
                     
-                    const top10 = scores.slice(0, 10);
-                    
-                    leaderboardBody.innerHTML = top10.map((score, index) => `
-                        <tr class="border-b">
-                            <td class="p-2 font-bold">${index + 1}</td>
-                            <td class="p-2">${score.name}</td>
-                            <td class="p-2">${score.time.toFixed(1)}</td>
-                        </tr>
-                    `).join('');
+                    if (scores.length === 0) {
+                         leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">No scores yet. Be the first!</td></tr>`;
+                    } else {
+                        leaderboardBody.innerHTML = scores.map((score, index) => `
+                            <tr class="border-b">
+                                <td class="p-2 font-bold">${index + 1}</td>
+                                <td class="p-2">${score.name}</td>
+                                <td class="p-2">${score.time.toFixed(1)}</td>
+                            </tr>
+                        `).join('');
+                    }
 
                 } catch (err) {
                     console.error("Error fetching leaderboard: ", err);
-                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Could not load leaderboard.</td></tr>`;
+                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Could not load leaderboard. Check console for errors.</td></tr>`;
                 } finally {
                     leaderboardLoading.classList.add('hidden');
                 }
             };
 
             const submitScore = async () => {
+                if (!db) return; // Don't submit if firebase failed
+
                 const playerName = playerNameInput.value.trim();
                 playerNameError.classList.add('hidden');
                 if (!playerName) {
@@ -453,6 +341,7 @@
                     });
                 } catch(err) {
                     console.error("Error submitting score: ", err);
+                    // Optionally show an error to the user
                 } finally {
                     submitScoreModal.classList.add('hidden');
                     submitScoreButton.disabled = false;
@@ -476,7 +365,12 @@
             document.addEventListener('keydown', (e) => {
                 if (!gameActive || e.repeat) return;
                 
-                if (e.key !== 'F5' && e.key !== 'F12') e.preventDefault();
+                // Allow dev tools
+                if (e.key === 'F5' || e.key === 'F12' || (e.metaKey || e.ctrlKey) && e.key === 'r') {
+                    return;
+                }
+                
+                e.preventDefault();
                 
                 clearTimeout(sequenceTimeout);
 
@@ -493,9 +387,11 @@
                     }
                 } else {
                     sequenceState = null;
+                    
+                    // --- CLEANUP ---
+                    // The 'code' property in your data object is already correct.
+                    // These extra 'if' checks were not needed.
                     let correctCode = activeChallenge.code;
-                    if (activeChallenge.key === '#') correctCode = 'Digit3';
-                    if (activeChallenge.key === '!') correctCode = 'Digit1';
 
                     if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeChallenge.ctrl) {
                         handleCorrectAnswer();
@@ -508,9 +404,52 @@
                 }
             });
 
+            // --- LOGIC FIX ---
+            // Moved this from nextChallenge to here. The first challenge
+            // should be loaded *before* the first keypress.
+            const originalStartGame = startGame;
+            startGame = () => {
+                originalStartGame();
+                if(gameActive) {
+                    // This was in nextChallenge, but it should be here.
+                    // This correctly sets the progress to 0/15 at the start.
+                    updateProgress(); 
+                    // This loads the *first* challenge (which was missing)
+                    nextChallenge(); 
+                }
+            };
+            startButton.addEventListener('click', startGame);
+
+
+            // --- LOGIC FIX ---
+            // Your `nextChallenge` function was using `challenges.pop()`, which
+            // pulls from the *end* of the array. But you were incrementing
+            // `completedChallenges` from the *start*. This means you were
+            // processing the list from both ends, causing bugs.
+            //
+            // Also, you were incrementing `completedChallenges` *before* the
+            // challenge was even displayed.
+            //
+            // I have:
+            // 1. Moved `completedChallenges++` to `handleCorrectAnswer`.
+            // 2. Changed `nextChallenge` to get the item at the *correct* index.
+            // 3. Updated `startGame` to load the first challenge correctly.
+            
+            // This was the original, buggy function:
+            /*
+            const nextChallenge_Original = () => {
+                if (completedChallenges >= CHALLENGE_COUNT) {
+                    endGame();
+                    return;
+                }
+                completedChallenges++; // <-- This was too early
+                updateProgress();
+
+                activeChallenge = challenges.pop(); // <-- This takes from the end
+                //...
+            };
+            */
+
             initializeSetup();
         });
     </script>
-</body>
-</html>
-
