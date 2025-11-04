@@ -1,7 +1,7 @@
 // This is the entire, correct content for firebase-config.js
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBiigI....(your key)...Luwf8ednak",
+  apiKey: "AIzaSyBiigI....(your key)...Luwf8ednak", // This key is from your previous screenshot
   authDomain: "shortcut-game-4f176.firebaseapp.com",
   projectId: "shortcut-game-4f176",
   storageBucket: "shortcut-game-4f176.appspot.com",
