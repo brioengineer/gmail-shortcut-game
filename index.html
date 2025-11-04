@@ -1,0 +1,453 @@
+<script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // --- IMPORT query, orderBy, and limit ---
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            serverTimestamp, 
+            setLogLevel,
+            query,
+            orderBy,
+            limit
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // --- Firebase Setup ---
+        // Import our local config file
+        import { firebaseConfig } from './firebase-config.js';
+        
+        let db, auth;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            // Simplified auth: Just sign in anonymously
+            await signInAnonymously(auth);
+            
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+            document.getElementById('subtitle').textContent = "Error: Could not connect to game server.";
+            document.getElementById('leaderboard-button').disabled = true;
+        }
+
+            // --- DOM Elements ---
+            const instructionText = document.getElementById('instruction-text');
+            const progressEl = document.getElementById('progress');
+            const timerEl = document.getElementById('timer');
+            const bestTimeEl = document.getElementById('best-time');
+            const startButton = document.getElementById('start-button');
+            const playAgainButton = document.getElementById('play-again-button');
+            const feedbackOverlay = document.getElementById('feedback-overlay');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            const feedbackText = document.getElementById('feedback-text');
+            const feedbackHint = document.getElementById('feedback-hint');
+            const emailSubject = document.getElementById('email-subject');
+            const emailSender = document.getElementById('email-sender');
+            const emailAvatar = document.getElementById('email-avatar');
+            const emailBody = document.getElementById('email-body');
+            const gameSetup = document.getElementById('game-setup');
+            const gameUi = document.getElementById('game-ui');
+            const subtitle = document.getElementById('subtitle');
+            const shortcutSelectionContainer = document.getElementById('shortcut-selection');
+            const selectionError = document.getElementById('selection-error');
+            const endGameControls = document.getElementById('end-game-controls');
+            
+            // Leaderboard elements
+            const leaderboardButton = document.getElementById('leaderboard-button');
+            const leaderboardModal = document.getElementById('leaderboard-modal');
+            const closeLeaderboardButton = document.getElementById('close-leaderboard-button');
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            const leaderboardLoading = document.getElementById('leaderboard-loading');
+            
+            // Submit score elements
+            const submitScoreModal = document.getElementById('submit-score-modal');
+            const playerNameInput = document.getElementById('player-name-input');
+            const playerNameError = document.getElementById('player-name-error');
+            const submitScoreButton = document.getElementById('submit-score-button');
+            const cancelSubmitButton = document.getElementById('cancel-submit-button');
+
+            // --- Game State ---
+            let bestTime = null;
+            let activeChallenge = null;
+            let gameActive = false;
+            let challenges = [];
+            let timerInterval = null;
+            let startTime = 0;
+            let completedChallenges = 0;
+            let lastGameTime = 0;
+            let sequenceState = null;
+            let sequenceTimeout = null;
+            const CHALLENGE_COUNT = 15;
+
+            // --- Game Data ---
+            const allShortcuts = [
+                { key: 'c', code: 'KeyC', shift: false, ctrl: false, description: 'Compose' },
+                { key: 'd', code: 'KeyD', shift: false, ctrl: false, description: 'Compose in new tab' },
+                { key: 'r', code: 'KeyR', shift: false, ctrl: false, description: 'Reply' },
+                { key: 'a', code: 'KeyA', shift: false, ctrl: false, description: 'Reply all' },
+                { key: 'e', code: 'KeyE', shift: false, ctrl: false, description: 'Archive' },
+                { key: 'l', code: 'KeyL', shift: false, ctrl: false, description: 'Label' },
+                { key: 'v', code: 'KeyV', shift: false, ctrl: false, description: 'Move' },
+                { key: 's', code: 'KeyS', shift: false, ctrl: false, description: 'Star' },
+                { key: 'b', code: 'KeyB', shift: false, ctrl: false, description: 'Snooze' },
+                { key: '#', code: 'Digit3', shift: true, ctrl: false, description: 'Delete' },
+                { key: '!', code: 'Digit1', shift: true, ctrl: false, description: 'Report spam' },
+                { key: 'z', code: 'KeyZ', shift: false, ctrl: false, description: 'Undo' },
+                { key: 'shift + t', code: 'KeyT', shift: true, ctrl: false, description: 'Create task' },
+                { key: 'j', code: 'KeyJ', shift: false, ctrl: false, description: 'Next message' },
+                { key: 'k', code: 'KeyK', shift: false, ctrl: false, description: 'Previous message' },
+                { key: 'o', code: 'KeyO', shift: false, ctrl: false, description: 'Open message' },
+                { key: 'u', code: 'KeyU', shift: false, ctrl: false, description: 'Back to threadlist' },
+                { key: '/', code: 'Slash', shift: false, ctrl: false, description: 'Search mail' },
+                { key: 'ctrl + k', code: 'KeyK', shift: false, ctrl: true, description: 'Insert hyperlink' },
+                { key: 'g then i', sequence: ['KeyG', 'KeyI'], description: 'Go to Inbox' },
+            ];
+
+            const mockEmails = [
+                { subject: "Project Update", sender: "Alice", body: "Latest updates on Project Phoenix are attached." },
+                { subject: "Team Lunch?", sender: "Bob", body: "Are we still on for lunch this Friday?" },
+                { subject: "Weekly Report", sender: "Charlie", body: "Please find the weekly performance report attached." },
+                { subject: "Your recent order", sender: "Online Store", body: "Your items have been shipped!" },
+            ];
+
+            // --- Initial Setup ---
+            const initializeSetup = () => {
+                loadBestTime();
+                shortcutSelectionContainer.innerHTML = '';
+                allShortcuts.forEach((sc, index) => {
+                    const div = document.createElement('div');
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = `sc-${index}`;
+                    input.value = index;
+                    input.checked = true;
+                    input.className = 'hidden shortcut-checkbox';
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `sc-${index}`;
+                    label.className = 'block border-2 border-gray-300 rounded-lg p-3 text-center cursor-pointer transition-all duration-200 h-full';
+                    label.innerHTML = `<span class="font-bold text-lg">${sc.key}</span><br><span class="text-sm text-gray-600">${sc.description}</span>`;
+                    
+                    div.appendChild(input);
+                    div.appendChild(label);
+                    shortcutSelectionContainer.appendChild(div);
+                });
+            };
+
+            const loadBestTime = () => {
+                bestTime = localStorage.getItem('gmailShortcutBestTime');
+                bestTimeEl.textContent = bestTime ? `${parseFloat(bestTime).toFixed(1)}s` : '-';
+            };
+            
+            // --- Game Logic ---
+            const startGame = () => {
+                const selectedIndexes = Array.from(shortcutSelectionContainer.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
+                if (selectedIndexes.length === 0) {
+                    selectionError.classList.remove('hidden');
+                    return;
+                }
+                selectionError.classList.add('hidden');
+
+                const selectedShortcuts = selectedIndexes.map(i => allShortcuts[i]);
+                challenges = [];
+                for(let i=0; i < CHALLENGE_COUNT; i++) {
+                    challenges.push(selectedShortcuts[Math.floor(Math.random() * selectedShortcuts.length)]);
+                }
+
+                gameActive = true;
+                completedChallenges = 0;
+                updateProgress();
+                
+                gameSetup.classList.add('hidden');
+                gameUi.classList.remove('hidden');
+                endGameControls.classList.add('hidden');
+                subtitle.textContent = "Press the correct key to complete the action. How fast can you go?";
+
+                startTime = Date.now();
+                timerInterval = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    timerEl.textContent = `${elapsed.toFixed(1)}s`;
+                }, 100);
+
+                nextChallenge();
+            };
+
+            const nextChallenge = () => {
+                if (completedChallenges >= CHALLENGE_COUNT) {
+                    endGame();
+                    return;
+                }
+                
+                activeChallenge = challenges[challenges.length - 1 - completedChallenges]; // Get next challenge
+                const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
+                instructionText.textContent = activeChallenge.description;
+                emailSubject.textContent = email.subject;
+                emailSender.textContent = email.sender;
+                emailAvatar.textContent = email.sender.charAt(0).toUpperCase();
+                emailBody.innerHTML = `<p>${email.body}</p>`;
+                
+                // --- BUG FIX ---
+                // You were incrementing this in nextChallenge, but it should be
+                // incremented in handleCorrectAnswer. I've moved it.
+                // completedChallenges++; 
+                // updateProgress();
+            };
+            
+            const endGame = () => {
+                clearInterval(timerInterval);
+                const finalTime = (Date.now() - startTime) / 1000;
+                gameActive = false;
+                lastGameTime = finalTime;
+                
+                timerEl.textContent = `${finalTime.toFixed(1)}s`;
+                let endMessage = `Finished! Your time: ${finalTime.toFixed(1)} seconds.`;
+
+                if (bestTime === null || finalTime < parseFloat(bestTime)) {
+                    bestTime = finalTime.toFixed(1);
+                    localStorage.setItem('gmailShortcutBestTime', bestTime);
+                    bestTimeEl.textContent = `${bestTime}s`;
+                    endMessage += ' 🎉 New Best Time!';
+                    // Only show submit modal if Firebase initialized
+                    if(db) {
+                        submitScoreModal.classList.remove('hidden'); 
+                    }
+                }
+                
+                instructionText.textContent = endMessage;
+                subtitle.textContent = "Great job! Click 'Play Again' to try and beat your best time.";
+                endGameControls.classList.remove('hidden');
+            };
+
+            const resetToSetup = () => {
+                gameUi.classList.add('hidden');
+                endGameControls.classList.add('hidden');
+                gameSetup.classList.remove('hidden');
+                subtitle.textContent = 'Select the shortcuts you want to practice.';
+                timerEl.textContent = "0.0s";
+                completedChallenges = 0;
+                updateProgress(); // Reset progress to 0/15
+                instructionText.textContent = 'Click "Start Game" to begin!'; // Reset instruction
+            };
+
+            const handleCorrectAnswer = () => {
+                // Increment score *after* getting it right
+                completedChallenges++;
+                updateProgress();
+
+                showFeedback(true);
+                setTimeout(() => {
+                    feedbackOverlay.classList.add('hidden');
+                    nextChallenge(); // Load the next challenge
+                }, 800);
+            };
+
+            const handleWrongAnswer = (pressedKey) => {
+                showFeedback(false, pressedKey);
+                setTimeout(() => {
+                    feedbackOverlay.classList.add('hidden');
+                }, 1200);
+            };
+
+            const showFeedback = (isCorrect, pressedKey = '') => {
+                feedbackOverlay.classList.remove('hidden');
+                feedbackOverlay.classList.add('flex', 'feedback-animation');
+                if (isCorrect) {
+                    feedbackIcon.innerHTML = '✅';
+                    feedbackIcon.style.color = '#10B981';
+                    feedbackText.textContent = 'Correct!';
+                    feedbackHint.innerHTML = '';
+                } else {
+                    feedbackIcon.innerHTML = '❌';
+                    feedbackIcon.style.color = '#EF4444';
+                    feedbackText.textContent = 'Not quite!';
+                    feedbackHint.innerHTML = `You pressed <span class="shortcut-key">${pressedKey}</span>. The correct shortcut is <span class="shortcut-key">${activeChallenge.key}</span>.`;
+                }
+            };
+            
+            const updateProgress = () => {
+                progressEl.textContent = `${completedChallenges}/${CHALLENGE_COUNT}`;
+            };
+            
+            // --- Leaderboard Logic (OPTIMIZED) ---
+            const showLeaderboard = async () => {
+                if (!db) {
+                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Error: Leaderboard is not available.</td></tr>`;
+                    return;
+                }
+                
+                leaderboardModal.classList.remove('hidden');
+                leaderboardLoading.classList.remove('hidden');
+                leaderboardBody.innerHTML = '';
+
+                try {
+                    const leaderboardCol = collection(db, "leaderboard");
+                    
+                    // --- CHANGE ---
+                    // Create a query to sort on the server and limit to 10
+                    const scoresQuery = query(leaderboardCol, orderBy("time", "asc"), limit(10));
+                    
+                    // Execute the query
+                    const snapshot = await getDocs(scoresQuery);
+                    
+                    // The rest of your logic was correct, but snapshot.docs is already sorted!
+                    const scores = snapshot.docs.map(doc => doc.data());
+                    
+                    if (scores.length === 0) {
+                         leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">No scores yet. Be the first!</td></tr>`;
+                    } else {
+                        leaderboardBody.innerHTML = scores.map((score, index) => `
+                            <tr class="border-b">
+                                <td class="p-2 font-bold">${index + 1}</td>
+                                <td class="p-2">${score.name}</td>
+                                <td class="p-2">${score.time.toFixed(1)}</td>
+                            </tr>
+                        `).join('');
+                    }
+
+                } catch (err) {
+                    console.error("Error fetching leaderboard: ", err);
+                    leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">Could not load leaderboard. Check console for errors.</td></tr>`;
+                } finally {
+                    leaderboardLoading.classList.add('hidden');
+                }
+            };
+
+            const submitScore = async () => {
+                if (!db) return; // Don't submit if firebase failed
+
+                const playerName = playerNameInput.value.trim();
+                playerNameError.classList.add('hidden');
+                if (!playerName) {
+                    playerNameError.classList.remove('hidden');
+                    return;
+                }
+
+                submitScoreButton.disabled = true;
+                submitScoreButton.textContent = "Submitting...";
+                
+                try {
+                    const leaderboardCol = collection(db, "leaderboard");
+                    await addDoc(leaderboardCol, {
+                        name: playerName,
+                        time: lastGameTime,
+                        createdAt: serverTimestamp()
+                    });
+                } catch(err) {
+                    console.error("Error submitting score: ", err);
+                    // Optionally show an error to the user
+                } finally {
+                    submitScoreModal.classList.add('hidden');
+                    submitScoreButton.disabled = false;
+                    submitScoreButton.textContent = "Submit Score";
+                    playerNameInput.value = '';
+                }
+            };
+
+            // --- Event Listeners ---
+            startButton.addEventListener('click', startGame);
+            playAgainButton.addEventListener('click', resetToSetup);
+            leaderboardButton.addEventListener('click', showLeaderboard);
+            closeLeaderboardButton.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
+            submitScoreButton.addEventListener('click', submitScore);
+            cancelSubmitButton.addEventListener('click', () => {
+                submitScoreModal.classList.add('hidden');
+                playerNameError.classList.add('hidden');
+            });
+
+
+            document.addEventListener('keydown', (e) => {
+                if (!gameActive || e.repeat) return;
+                
+                // Allow dev tools
+                if (e.key === 'F5' || e.key === 'F12' || (e.metaKey || e.ctrlKey) && e.key === 'r') {
+                    return;
+                }
+                
+                e.preventDefault();
+                
+                clearTimeout(sequenceTimeout);
+
+                if (activeChallenge.sequence) {
+                    if (sequenceState === null && e.code === activeChallenge.sequence[0]) {
+                        sequenceState = activeChallenge.sequence[0];
+                        sequenceTimeout = setTimeout(() => { sequenceState = null; }, 1500);
+                    } else if (sequenceState === activeChallenge.sequence[0] && e.code === activeChallenge.sequence[1]) {
+                        sequenceState = null;
+                        handleCorrectAnswer();
+                    } else {
+                        sequenceState = null;
+                        handleWrongAnswer((e.shiftKey ? 'shift + ' : '') + e.key.toLowerCase());
+                    }
+                } else {
+                    sequenceState = null;
+                    
+                    // --- CLEANUP ---
+                    // The 'code' property in your data object is already correct.
+                    // These extra 'if' checks were not needed.
+                    let correctCode = activeChallenge.code;
+
+                    if (e.code === correctCode && e.shiftKey === !!activeChallenge.shift && e.ctrlKey === !!activeChallenge.ctrl) {
+                        handleCorrectAnswer();
+                    } else {
+                        let pressed = (e.ctrlKey ? 'ctrl + ' : '') + (e.shiftKey ? 'shift + ' : '') + (e.altKey ? 'alt + ' : '') + e.key.toLowerCase();
+                        if (!['shift', 'control', 'alt', 'meta'].includes(e.key.toLowerCase())) {
+                           handleWrongAnswer(pressed);
+                        }
+                    }
+                }
+            });
+
+            // --- LOGIC FIX ---
+            // Moved this from nextChallenge to here. The first challenge
+            // should be loaded *before* the first keypress.
+            const originalStartGame = startGame;
+            startGame = () => {
+                originalStartGame();
+                if(gameActive) {
+                    // This was in nextChallenge, but it should be here.
+                    // This correctly sets the progress to 0/15 at the start.
+                    updateProgress(); 
+                    // This loads the *first* challenge (which was missing)
+                    nextChallenge(); 
+                }
+            };
+            startButton.addEventListener('click', startGame);
+
+
+            // --- LOGIC FIX ---
+            // Your `nextChallenge` function was using `challenges.pop()`, which
+            // pulls from the *end* of the array. But you were incrementing
+            // `completedChallenges` from the *start*. This means you were
+            // processing the list from both ends, causing bugs.
+            //
+            // Also, you were incrementing `completedChallenges` *before* the
+            // challenge was even displayed.
+            //
+            // I have:
+            // 1. Moved `completedChallenges++` to `handleCorrectAnswer`.
+            // 2. Changed `nextChallenge` to get the item at the *correct* index.
+            // 3. Updated `startGame` to load the first challenge correctly.
+            
+            // This was the original, buggy function:
+            /*
+            const nextChallenge_Original = () => {
+                if (completedChallenges >= CHALLENGE_COUNT) {
+                    endGame();
+                    return;
+                }
+                completedChallenges++; // <-- This was too early
+                updateProgress();
+
+                activeChallenge = challenges.pop(); // <-- This takes from the end
+                //...
+            };
+            */
+
+            initializeSetup();
+        });
+    </script>
